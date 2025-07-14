@@ -406,6 +406,23 @@ function updateFileList() {
         `;
     });
     
+    // Add global playback button
+    if (gpxFiles.size > 0) {
+        html += `
+            <div class="file-item" style="border-top: 2px solid #dee2e6; margin-top: 8px; padding-top: 12px;">
+                <div class="file-info">
+                    <div class="file-name">Track Playback</div>
+                    <div class="file-stats">Animate visible tracks</div>
+                </div>
+                <div class="file-actions">
+                    <button class="file-btn" onclick="startPlayback()" title="Start playback">
+                        ▶
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
     content.innerHTML = html;
 }
 
@@ -600,5 +617,354 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && (isDrawingStartLine || isDrawingFinishLine)) {
         resetDrawing();
         console.log('Line drawing cancelled with Escape key');
+    }
+});
+
+// Playback functionality - restructured for simultaneous track animation
+let playbackState = {
+    isPlaying: false,
+    isPaused: false,
+    tracks: [], // Array of track objects with their own progress
+    animationId: null,
+    speed: 1,
+    lastUpdateTime: 0,
+    maxPoints: 0 // Maximum points across all tracks
+};
+
+const playbackLayer = L.layerGroup().addTo(map);
+
+// Function to prepare tracks for simultaneous playback
+function prepareTracksForPlayback() {
+    const tracks = [];
+    let maxPoints = 0;
+    
+    gpxFiles.forEach((file, fileId) => {
+        if (file.visible && file.data.tracks.length > 0) {
+            file.data.tracks.forEach((track, trackIndex) => {
+                if (track.points.length > 0) {
+                    const trackData = {
+                        fileId: fileId,
+                        fileName: file.fileName,
+                        trackIndex: trackIndex,
+                        trackName: track.name,
+                        color: file.color,
+                        points: track.points,
+                        currentPointIndex: 0,
+                        marker: null,
+                        isComplete: false
+                    };
+                    
+                    tracks.push(trackData);
+                    maxPoints = Math.max(maxPoints, track.points.length);
+                }
+            });
+        }
+    });
+    
+    return { tracks, maxPoints };
+}
+
+// Function to create playback marker for a specific track
+function createTrackPlaybackMarker(track, lat, lng) {
+    // Remove existing marker for this track
+    if (track.marker) {
+        playbackLayer.removeLayer(track.marker);
+    }
+    
+    // Create new marker with track's color
+    track.marker = L.circleMarker([lat, lng], {
+        radius: 8,
+        fillColor: track.color,
+        color: '#ffffff',
+        weight: 3,
+        opacity: 1,
+        fillOpacity: 0.9,
+        className: 'playback-marker'
+    }).addTo(playbackLayer);
+    
+    // Add popup with current point info
+    const point = track.points[track.currentPointIndex];
+    track.marker.bindPopup(`
+        <div>
+            <h4>${track.trackName}</h4>
+            <p><strong>File:</strong> ${track.fileName}</p>
+            <p><strong>Point:</strong> ${track.currentPointIndex + 1} / ${track.points.length}</p>
+            ${point.elevation ? `<p><strong>Elevation:</strong> ${point.elevation}m</p>` : ''}
+            ${point.time ? `<p><strong>Time:</strong> ${new Date(point.time).toLocaleString()}</p>` : ''}
+            <p><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+        </div>
+    `);
+    
+    return track.marker;
+}
+
+// Function to update playback progress based on the track with most progress
+function updatePlaybackProgress() {
+    if (playbackState.tracks.length === 0) return;
+    
+    // Calculate progress based on the track that has progressed the most
+    let maxProgress = 0;
+    let totalActivePoints = 0;
+    let currentActivePoints = 0;
+    
+    playbackState.tracks.forEach(track => {
+        const trackProgress = track.points.length > 0 ? track.currentPointIndex / track.points.length : 0;
+        maxProgress = Math.max(maxProgress, trackProgress);
+        
+        totalActivePoints += track.points.length;
+        currentActivePoints += track.currentPointIndex;
+    });
+    
+    const progressPercent = maxProgress * 100;
+    
+    document.getElementById('progressFill').style.width = progressPercent + '%';
+    document.getElementById('progressSlider').value = progressPercent;
+    document.getElementById('progressText').textContent = 
+        `${Math.round(progressPercent)}% (${currentActivePoints} / ${totalActivePoints} total points)`;
+}
+
+// Function to update all track markers simultaneously
+function updateAllTrackMarkers() {
+    let hasActiveMarkers = false;
+    
+    playbackState.tracks.forEach(track => {
+        if (!track.isComplete && track.currentPointIndex < track.points.length) {
+            const point = track.points[track.currentPointIndex];
+            createTrackPlaybackMarker(track, point.lat, point.lng);
+            track.currentPointIndex++;
+            hasActiveMarkers = true;
+            
+            // Mark track as complete if we've reached the end
+            if (track.currentPointIndex >= track.points.length) {
+                track.isComplete = true;
+            }
+        }
+    });
+    
+    return hasActiveMarkers;
+}
+
+// Animation function for simultaneous playback
+function animateSimultaneousPlayback() {
+    if (!playbackState.isPlaying || playbackState.isPaused) {
+        return;
+    }
+    
+    const now = Date.now();
+    const deltaTime = now - playbackState.lastUpdateTime;
+    const baseInterval = 100; // Base interval in milliseconds
+    const adjustedInterval = baseInterval / playbackState.speed;
+    
+    if (deltaTime >= adjustedInterval) {
+        const hasActiveMarkers = updateAllTrackMarkers();
+        updatePlaybackProgress();
+        
+        if (!hasActiveMarkers) {
+            // All tracks completed
+            stopPlayback();
+            return;
+        }
+        
+        playbackState.lastUpdateTime = now;
+    }
+    
+    playbackState.animationId = requestAnimationFrame(animateSimultaneousPlayback);
+}
+
+// Function to start simultaneous playback
+function startPlayback() {
+    const { tracks, maxPoints } = prepareTracksForPlayback();
+    
+    if (tracks.length === 0) {
+        alert('No visible tracks available for playback. Please load and show some GPX files first.');
+        return;
+    }
+    
+    // Reset all tracks to beginning
+    tracks.forEach(track => {
+        track.currentPointIndex = 0;
+        track.isComplete = false;
+        track.marker = null;
+    });
+    
+    playbackState.tracks = tracks;
+    playbackState.maxPoints = maxPoints;
+    playbackState.isPlaying = true;
+    playbackState.isPaused = false;
+    playbackState.lastUpdateTime = Date.now();
+    
+    // Show playback controls
+    document.getElementById('playbackControls').classList.remove('hidden');
+    
+    // Update track count info
+    document.getElementById('trackCountInfo').textContent = 
+        `Playing ${tracks.length} track${tracks.length !== 1 ? 's' : ''} simultaneously`;
+    
+    // Update UI
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    playPauseBtn.textContent = '⏸';
+    playPauseBtn.className = 'playback-btn pause';
+    playPauseBtn.title = 'Pause';
+    
+    // Start animation
+    animateSimultaneousPlayback();
+    
+    console.log(`Started simultaneous playback with ${tracks.length} tracks`);
+}
+
+// Function to pause playback
+function pausePlayback() {
+    playbackState.isPaused = true;
+    
+    if (playbackState.animationId) {
+        cancelAnimationFrame(playbackState.animationId);
+        playbackState.animationId = null;
+    }
+    
+    // Update UI
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    playPauseBtn.textContent = '▶';
+    playPauseBtn.className = 'playback-btn play';
+    playPauseBtn.title = 'Play';
+    
+    console.log('Playback paused');
+}
+
+// Function to resume playback
+function resumePlayback() {
+    // Check if all tracks are complete
+    const allComplete = playbackState.tracks.every(track => track.isComplete);
+    
+    if (allComplete) {
+        // If all tracks are complete, restart from beginning
+        stopPlayback();
+        startPlayback();
+        return;
+    }
+    
+    playbackState.isPaused = false;
+    playbackState.lastUpdateTime = Date.now();
+    
+    // Update UI
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    playPauseBtn.textContent = '⏸';
+    playPauseBtn.className = 'playback-btn pause';
+    playPauseBtn.title = 'Pause';
+    
+    // Resume animation
+    animateSimultaneousPlayback();
+    
+    console.log('Playback resumed');
+}
+
+// Function to stop playback
+function stopPlayback() {
+    playbackState.isPlaying = false;
+    playbackState.isPaused = false;
+    
+    if (playbackState.animationId) {
+        cancelAnimationFrame(playbackState.animationId);
+        playbackState.animationId = null;
+    }
+    
+    // Remove all track markers
+    playbackState.tracks.forEach(track => {
+        if (track.marker) {
+            playbackLayer.removeLayer(track.marker);
+            track.marker = null;
+        }
+        track.currentPointIndex = 0;
+        track.isComplete = false;
+    });
+    
+    // Reset track count info
+    document.getElementById('trackCountInfo').textContent = 'Simultaneous playback ready';
+    
+    // Update UI
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    playPauseBtn.textContent = '▶';
+    playPauseBtn.className = 'playback-btn play';
+    playPauseBtn.title = 'Play';
+    
+    updatePlaybackProgress();
+    
+    console.log('Playback stopped');
+}
+
+// Function to seek to specific position (affects all tracks proportionally)
+function seekToPosition(percent) {
+    if (playbackState.tracks.length === 0) return;
+    
+    playbackState.tracks.forEach(track => {
+        const targetIndex = Math.floor((percent / 100) * track.points.length);
+        track.currentPointIndex = Math.max(0, Math.min(targetIndex, track.points.length - 1));
+        track.isComplete = track.currentPointIndex >= track.points.length - 1;
+        
+        // Update marker position if track has points
+        if (track.points.length > 0 && track.currentPointIndex < track.points.length) {
+            const point = track.points[track.currentPointIndex];
+            createTrackPlaybackMarker(track, point.lat, point.lng);
+        }
+    });
+    
+    updatePlaybackProgress();
+}
+
+// Event listeners for playback controls
+document.getElementById('playPauseBtn').addEventListener('click', function() {
+    if (!playbackState.isPlaying) {
+        startPlayback();
+    } else if (playbackState.isPaused) {
+        resumePlayback();
+    } else {
+        pausePlayback();
+    }
+});
+
+document.getElementById('stopBtn').addEventListener('click', function() {
+    stopPlayback();
+});
+
+document.getElementById('closePlayback').addEventListener('click', function() {
+    stopPlayback();
+    document.getElementById('playbackControls').classList.add('hidden');
+});
+
+document.getElementById('playbackSpeed').addEventListener('change', function() {
+    playbackState.speed = parseFloat(this.value);
+    console.log(`Playback speed changed to ${playbackState.speed}x`);
+});
+
+document.getElementById('progressSlider').addEventListener('input', function() {
+    if (playbackState.tracks.length > 0) {
+        seekToPosition(parseFloat(this.value));
+    }
+});
+
+// Add keyboard shortcuts for playback
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && (isDrawingStartLine || isDrawingFinishLine)) {
+        resetDrawing();
+        console.log('Line drawing cancelled with Escape key');
+    }
+    
+    // Playback keyboard shortcuts (only when not drawing lines)
+    if (!isDrawingStartLine && !isDrawingFinishLine) {
+        switch(e.key) {
+            case ' ': // Spacebar for play/pause
+                e.preventDefault();
+                if (!playbackState.isPlaying) {
+                    startPlayback();
+                } else if (playbackState.isPaused) {
+                    resumePlayback();
+                } else {
+                    pausePlayback();
+                }
+                break;
+            case 'Enter': // Enter for stop
+                e.preventDefault();
+                stopPlayback();
+                break;
+        }
     }
 });

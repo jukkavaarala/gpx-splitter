@@ -23,6 +23,42 @@
         <button id="clearLines" class="control-btn">Clear Lines</button>
     </div>
     
+    <!-- Playback Controls -->
+    <div id="playbackControls" class="playback-controls hidden">
+        <div class="playback-header">
+            <h4>Track Playback</h4>
+            <button id="closePlayback" class="close-btn">&times;</button>
+        </div>
+        <div class="playback-content">
+            <div id="trackCountInfo" class="track-count-info">
+                Simultaneous playback ready
+            </div>
+            <div class="playback-buttons">
+                <button id="playPauseBtn" class="playback-btn play" title="Play">▶</button>
+                <button id="stopBtn" class="playback-btn stop" title="Stop">⏹</button>
+            </div>
+            <div class="playback-info">
+                <div class="speed-control">
+                    <label for="playbackSpeed">Speed:</label>
+                    <select id="playbackSpeed">
+                        <option value="0.5">0.5x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="2">2x</option>
+                        <option value="5">5x</option>
+                        <option value="10">10x</option>
+                    </select>
+                </div>
+                <div class="progress-info">
+                    <span id="progressText">0 / 0 points</span>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+                <input id="progressSlider" type="range" min="0" max="100" value="0" class="progress-slider">
+            </div>
+        </div>
+    </div>
+    
     <div id="gpxFileList" class="gpx-file-list hidden">
         <div class="file-list-header">
             <h3>Loaded GPX Files</h3>

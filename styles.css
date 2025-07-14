@@ -370,3 +370,243 @@ body {
     white-space: nowrap !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
+
+/* Playback Controls */
+.playback-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 320px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.playback-controls.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+}
+
+.playback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.playback-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.playback-content {
+    padding: 16px;
+}
+
+.track-count-info {
+    font-size: 11px;
+    color: #6c757d;
+    text-align: center;
+    margin-bottom: 8px;
+    font-style: italic;
+}
+
+.playback-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    justify-content: center;
+}
+
+.playback-btn {
+    background: #007bff;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.playback-btn:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.playback-btn:active {
+    transform: translateY(0);
+}
+
+.playback-btn.play {
+    background: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.playback-btn.play:hover {
+    background: #218838;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.playback-btn.pause {
+    background: #ffc107;
+    color: #212529;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+}
+
+.playback-btn.pause:hover {
+    background: #e0a800;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4);
+}
+
+.playback-btn.stop {
+    background: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.playback-btn.stop:hover {
+    background: #c82333;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.playback-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.speed-control label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.speed-control select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+}
+
+.progress-info {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.1s ease;
+}
+
+.progress-slider {
+    position: absolute;
+    top: -10px;
+    left: 0;
+    width: 100%;
+    height: 26px;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #007bff;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Playback marker */
+.playback-marker {
+    z-index: 1000 !important;
+}
+
+/* Multiple playback markers styling */
+.leaflet-marker-icon.playback-marker {
+    border: 3px solid white !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Responsive adjustments for playback controls */
+@media (max-width: 768px) {
+    .playback-controls {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+    }
+    
+    .playback-content {
+        padding: 12px;
+    }
+    
+    .playback-buttons {
+        margin-bottom: 10px;
+    }
+    
+    .playback-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .playback-info {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+    
+    .track-count-info {
+        font-size: 10px;
+    }
+}
