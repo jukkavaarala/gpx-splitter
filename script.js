@@ -87,6 +87,101 @@ function generateColor(index) {
     return `hsl(${hue}, 70%, 50%)`;
 }
 
+// Geometric utility functions for line intersection calculations
+function distanceToLineSegment(point, line1, line2) {
+    const A = point.lng - line1.lng;
+    const B = point.lat - line1.lat;
+    const C = line2.lng - line1.lng;
+    const D = line2.lat - line1.lat;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) {
+        param = dot / lenSq;
+    }
+
+    let xx, yy;
+
+    if (param < 0) {
+        xx = line1.lng;
+        yy = line1.lat;
+    } else if (param > 1) {
+        xx = line2.lng;
+        yy = line2.lat;
+    } else {
+        xx = line1.lng + param * C;
+        yy = line1.lat + param * D;
+    }
+
+    const dx = point.lng - xx;
+    const dy = point.lat - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function checkLineIntersection(track, line) {
+    if (!line || !track.points || track.points.length < 2) {
+        return null;
+    }
+
+    const lineLatLngs = line.line.getLatLngs();
+    const lineStart = lineLatLngs[0];
+    const lineEnd = lineLatLngs[1];
+    
+    // Threshold for intersection detection (in degrees, roughly 10 meters)
+    const intersectionThreshold = 0.0001;
+    
+    for (let i = 0; i < track.points.length; i++) {
+        const point = track.points[i];
+        const distance = distanceToLineSegment(point, lineStart, lineEnd);
+        
+        if (distance < intersectionThreshold) {
+            return {
+                pointIndex: i,
+                point: point,
+                distance: distance
+            };
+        }
+    }
+    
+    return null;
+}
+
+function findTrackSegment(track, startLine, finishLine) {
+    const startIntersection = startLine ? checkLineIntersection(track, startLine) : null;
+    const finishIntersection = finishLine ? checkLineIntersection(track, finishLine) : null;
+    
+    let startIndex = 0;
+    let endIndex = track.points.length - 1;
+    
+    if (startIntersection) {
+        startIndex = startIntersection.pointIndex;
+    }
+    
+    if (finishIntersection) {
+        endIndex = finishIntersection.pointIndex;
+    }
+    
+    // Ensure start comes before finish
+    if (startIndex >= endIndex) {
+        if (startIntersection && finishIntersection) {
+            // If both lines intersect but start is after finish, swap them
+            const temp = startIndex;
+            startIndex = endIndex;
+            endIndex = temp;
+        }
+    }
+    
+    return {
+        startIndex: startIndex,
+        endIndex: endIndex,
+        hasStartLine: !!startIntersection,
+        hasFinishLine: !!finishIntersection,
+        totalPoints: endIndex - startIndex + 1
+    };
+}
+
 // Function to create a line between two points
 function createLine(point1, point2, style, label) {
     const line = L.polyline([point1, point2], style).addTo(linesGroup);
@@ -620,7 +715,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Playback functionality - restructured for simultaneous track animation
+// Playback functionality - restructured for simultaneous track animation with start/finish line support
 let playbackState = {
     isPlaying: false,
     isPaused: false,
@@ -633,7 +728,7 @@ let playbackState = {
 
 const playbackLayer = L.layerGroup().addTo(map);
 
-// Function to prepare tracks for simultaneous playback
+// Function to prepare tracks for simultaneous playback with start/finish line detection
 function prepareTracksForPlayback() {
     const tracks = [];
     let maxPoints = 0;
@@ -642,6 +737,9 @@ function prepareTracksForPlayback() {
         if (file.visible && file.data.tracks.length > 0) {
             file.data.tracks.forEach((track, trackIndex) => {
                 if (track.points.length > 0) {
+                    // Find track segment between start and finish lines
+                    const segment = findTrackSegment(track, startLine, finishLine);
+                    
                     const trackData = {
                         fileId: fileId,
                         fileName: file.fileName,
@@ -649,13 +747,18 @@ function prepareTracksForPlayback() {
                         trackName: track.name,
                         color: file.color,
                         points: track.points,
-                        currentPointIndex: 0,
+                        startIndex: segment.startIndex,
+                        endIndex: segment.endIndex,
+                        currentPointIndex: segment.startIndex,
                         marker: null,
-                        isComplete: false
+                        isComplete: false,
+                        hasStartLine: segment.hasStartLine,
+                        hasFinishLine: segment.hasFinishLine,
+                        segmentPoints: segment.totalPoints
                     };
                     
                     tracks.push(trackData);
-                    maxPoints = Math.max(maxPoints, track.points.length);
+                    maxPoints = Math.max(maxPoints, segment.totalPoints);
                 }
             });
         }
@@ -684,11 +787,15 @@ function createTrackPlaybackMarker(track, lat, lng) {
     
     // Add popup with current point info
     const point = track.points[track.currentPointIndex];
+    const progressInSegment = track.currentPointIndex - track.startIndex + 1;
     track.marker.bindPopup(`
         <div>
             <h4>${track.trackName}</h4>
             <p><strong>File:</strong> ${track.fileName}</p>
-            <p><strong>Point:</strong> ${track.currentPointIndex + 1} / ${track.points.length}</p>
+            <p><strong>Segment Progress:</strong> ${progressInSegment} / ${track.segmentPoints}</p>
+            <p><strong>Total Point:</strong> ${track.currentPointIndex + 1} / ${track.points.length}</p>
+            ${track.hasStartLine ? '<p><span style="color: #28a745;">⚑ Started from start line</span></p>' : ''}
+            ${track.hasFinishLine ? '<p><span style="color: #dc3545;">🏁 Will stop at finish line</span></p>' : ''}
             ${point.elevation ? `<p><strong>Elevation:</strong> ${point.elevation}m</p>` : ''}
             ${point.time ? `<p><strong>Time:</strong> ${new Date(point.time).toLocaleString()}</p>` : ''}
             <p><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
@@ -698,21 +805,22 @@ function createTrackPlaybackMarker(track, lat, lng) {
     return track.marker;
 }
 
-// Function to update playback progress based on the track with most progress
+// Function to update playback progress based on segment progress
 function updatePlaybackProgress() {
     if (playbackState.tracks.length === 0) return;
     
-    // Calculate progress based on the track that has progressed the most
+    // Calculate progress based on segment completion
     let maxProgress = 0;
-    let totalActivePoints = 0;
-    let currentActivePoints = 0;
+    let totalSegmentPoints = 0;
+    let currentSegmentPoints = 0;
     
     playbackState.tracks.forEach(track => {
-        const trackProgress = track.points.length > 0 ? track.currentPointIndex / track.points.length : 0;
-        maxProgress = Math.max(maxProgress, trackProgress);
+        const segmentProgress = track.segmentPoints > 0 ? 
+            (track.currentPointIndex - track.startIndex) / (track.endIndex - track.startIndex) : 0;
+        maxProgress = Math.max(maxProgress, segmentProgress);
         
-        totalActivePoints += track.points.length;
-        currentActivePoints += track.currentPointIndex;
+        totalSegmentPoints += track.segmentPoints;
+        currentSegmentPoints += Math.max(0, track.currentPointIndex - track.startIndex);
     });
     
     const progressPercent = maxProgress * 100;
@@ -720,7 +828,7 @@ function updatePlaybackProgress() {
     document.getElementById('progressFill').style.width = progressPercent + '%';
     document.getElementById('progressSlider').value = progressPercent;
     document.getElementById('progressText').textContent = 
-        `${Math.round(progressPercent)}% (${currentActivePoints} / ${totalActivePoints} total points)`;
+        `${Math.round(progressPercent)}% (${currentSegmentPoints} / ${totalSegmentPoints} segment points)`;
 }
 
 // Function to update all track markers simultaneously
@@ -728,15 +836,16 @@ function updateAllTrackMarkers() {
     let hasActiveMarkers = false;
     
     playbackState.tracks.forEach(track => {
-        if (!track.isComplete && track.currentPointIndex < track.points.length) {
+        if (!track.isComplete && track.currentPointIndex <= track.endIndex) {
             const point = track.points[track.currentPointIndex];
             createTrackPlaybackMarker(track, point.lat, point.lng);
             track.currentPointIndex++;
             hasActiveMarkers = true;
             
-            // Mark track as complete if we've reached the end
-            if (track.currentPointIndex >= track.points.length) {
+            // Mark track as complete if we've reached the end of the segment
+            if (track.currentPointIndex > track.endIndex) {
                 track.isComplete = true;
+                console.log(`Track ${track.trackName} completed at point ${track.currentPointIndex}`);
             }
         }
     });
@@ -780,9 +889,26 @@ function startPlayback() {
         return;
     }
     
-    // Reset all tracks to beginning
+    // Check if start/finish lines are defined
+    let statusMessage = `Playing ${tracks.length} track${tracks.length !== 1 ? 's' : ''} simultaneously`;
+    let hasStartOrFinish = false;
+    
+    if (startLine || finishLine) {
+        let lineInfo = [];
+        if (startLine) {
+            lineInfo.push('start line');
+            hasStartOrFinish = true;
+        }
+        if (finishLine) {
+            lineInfo.push('finish line');
+            hasStartOrFinish = true;
+        }
+        statusMessage += ` (using ${lineInfo.join(' and ')})`;
+    }
+    
+    // Reset all tracks to their start positions
     tracks.forEach(track => {
-        track.currentPointIndex = 0;
+        track.currentPointIndex = track.startIndex;
         track.isComplete = false;
         track.marker = null;
     });
@@ -797,8 +923,7 @@ function startPlayback() {
     document.getElementById('playbackControls').classList.remove('hidden');
     
     // Update track count info
-    document.getElementById('trackCountInfo').textContent = 
-        `Playing ${tracks.length} track${tracks.length !== 1 ? 's' : ''} simultaneously`;
+    document.getElementById('trackCountInfo').textContent = statusMessage;
     
     // Update UI
     const playPauseBtn = document.getElementById('playPauseBtn');
@@ -810,6 +935,14 @@ function startPlayback() {
     animateSimultaneousPlayback();
     
     console.log(`Started simultaneous playback with ${tracks.length} tracks`);
+    if (hasStartOrFinish) {
+        console.log('Playback will respect start/finish line boundaries');
+        tracks.forEach(track => {
+            if (track.hasStartLine || track.hasFinishLine) {
+                console.log(`Track ${track.trackName}: segment from point ${track.startIndex} to ${track.endIndex} (${track.segmentPoints} points)`);
+            }
+        });
+    }
 }
 
 // Function to pause playback
@@ -873,12 +1006,16 @@ function stopPlayback() {
             playbackLayer.removeLayer(track.marker);
             track.marker = null;
         }
-        track.currentPointIndex = 0;
+        track.currentPointIndex = track.startIndex;
         track.isComplete = false;
     });
     
     // Reset track count info
-    document.getElementById('trackCountInfo').textContent = 'Simultaneous playback ready';
+    let statusMessage = 'Simultaneous playback ready';
+    if (startLine || finishLine) {
+        statusMessage += ' (start/finish lines detected)';
+    }
+    document.getElementById('trackCountInfo').textContent = statusMessage;
     
     // Update UI
     const playPauseBtn = document.getElementById('playPauseBtn');
@@ -891,14 +1028,17 @@ function stopPlayback() {
     console.log('Playback stopped');
 }
 
-// Function to seek to specific position (affects all tracks proportionally)
+// Function to seek to specific position (affects all tracks proportionally within their segments)
 function seekToPosition(percent) {
     if (playbackState.tracks.length === 0) return;
     
     playbackState.tracks.forEach(track => {
-        const targetIndex = Math.floor((percent / 100) * track.points.length);
-        track.currentPointIndex = Math.max(0, Math.min(targetIndex, track.points.length - 1));
-        track.isComplete = track.currentPointIndex >= track.points.length - 1;
+        const segmentLength = track.endIndex - track.startIndex;
+        const targetOffset = Math.floor((percent / 100) * segmentLength);
+        const targetIndex = track.startIndex + targetOffset;
+        
+        track.currentPointIndex = Math.max(track.startIndex, Math.min(targetIndex, track.endIndex));
+        track.isComplete = track.currentPointIndex >= track.endIndex;
         
         // Update marker position if track has points
         if (track.points.length > 0 && track.currentPointIndex < track.points.length) {
