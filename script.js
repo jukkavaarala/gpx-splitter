@@ -489,3 +489,116 @@ document.getElementById('closeFileList').addEventListener('click', function () {
     fileList.classList.add('hidden');
     button.textContent = 'Show Files';
 });
+
+// Function to clear all lines
+function clearAllLines() {
+    if (startLine) {
+        linesGroup.removeLayer(startLine.line);
+        linesGroup.removeLayer(startLine.marker);
+        startLine = null;
+    }
+    
+    if (finishLine) {
+        linesGroup.removeLayer(finishLine.line);
+        linesGroup.removeLayer(finishLine.marker);
+        finishLine = null;
+    }
+    
+    resetDrawing();
+    console.log('All lines cleared');
+}
+
+// Add event listeners for line drawing buttons
+document.getElementById('addStartLine').addEventListener('click', function() {
+    if (isDrawingStartLine) {
+        // Cancel drawing
+        resetDrawing();
+    } else {
+        // Start drawing start line
+        resetDrawing(); // Reset any other drawing states
+        isDrawingStartLine = true;
+        drawingPoints = [];
+        
+        this.classList.add('active');
+        this.textContent = 'Click two points (Cancel)';
+        map.getContainer().style.cursor = 'crosshair';
+        
+        console.log('Start line drawing mode activated');
+    }
+});
+
+document.getElementById('addFinishLine').addEventListener('click', function() {
+    if (isDrawingFinishLine) {
+        // Cancel drawing
+        resetDrawing();
+    } else {
+        // Start drawing finish line
+        resetDrawing(); // Reset any other drawing states
+        isDrawingFinishLine = true;
+        drawingPoints = [];
+        
+        this.classList.add('active');
+        this.textContent = 'Click two points (Cancel)';
+        map.getContainer().style.cursor = 'crosshair';
+        
+        console.log('Finish line drawing mode activated');
+    }
+});
+
+document.getElementById('clearLines').addEventListener('click', function() {
+    clearAllLines();
+});
+
+// Map click handler for drawing lines
+map.on('click', function(e) {
+    if (isDrawingStartLine || isDrawingFinishLine) {
+        drawingPoints.push(e.latlng);
+        
+        if (drawingPoints.length === 1) {
+            // First point clicked, update button text
+            const button = isDrawingStartLine ? 
+                document.getElementById('addStartLine') : 
+                document.getElementById('addFinishLine');
+            button.textContent = 'Click second point (Cancel)';
+            
+            console.log('First point selected:', e.latlng);
+        } else if (drawingPoints.length === 2) {
+            // Second point clicked, create the line
+            const point1 = drawingPoints[0];
+            const point2 = drawingPoints[1];
+            
+            if (isDrawingStartLine) {
+                // Remove existing start line if any
+                if (startLine) {
+                    linesGroup.removeLayer(startLine.line);
+                    linesGroup.removeLayer(startLine.marker);
+                }
+                
+                // Create new start line
+                startLine = createLine(point1, point2, startLineStyle, 'START');
+                console.log('Start line created between:', point1, point2);
+            } else if (isDrawingFinishLine) {
+                // Remove existing finish line if any
+                if (finishLine) {
+                    linesGroup.removeLayer(finishLine.line);
+                    linesGroup.removeLayer(finishLine.marker);
+                }
+                
+                // Create new finish line
+                finishLine = createLine(point1, point2, finishLineStyle, 'FINISH');
+                console.log('Finish line created between:', point1, point2);
+            }
+            
+            // Reset drawing state
+            resetDrawing();
+        }
+    }
+});
+
+// Add keyboard escape handler to cancel drawing
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && (isDrawingStartLine || isDrawingFinishLine)) {
+        resetDrawing();
+        console.log('Line drawing cancelled with Escape key');
+    }
+});
