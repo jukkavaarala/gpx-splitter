@@ -409,6 +409,27 @@ function updateFileList() {
     content.innerHTML = html;
 }
 
+// Function to reset drawing state
+function resetDrawing() {
+    isDrawingStartLine = false;
+    isDrawingFinishLine = false;
+    drawingPoints = [];
+    map.getContainer().style.cursor = '';
+    
+    // Reset button states
+    const startBtn = document.getElementById('addStartLine');
+    const finishBtn = document.getElementById('addFinishLine');
+    
+    if (startBtn) {
+        startBtn.classList.remove('active');
+        startBtn.textContent = 'Add Start Line';
+    }
+    if (finishBtn) {
+        finishBtn.classList.remove('active');
+        finishBtn.textContent = 'Add Finish Line';
+    }
+}
+
 // File upload handlers
 document.getElementById('uploadGpx').addEventListener('click', function() {
     document.getElementById('gpxFileInput').click();
@@ -461,10 +482,10 @@ function toggleFileList() {
 }
 
 document.getElementById('toggleFileList').addEventListener('click', toggleFileList);
-document.getElementById('closeFileList').addEventListener('click', function() {
+
+document.getElementById('closeFileList').addEventListener('click', function () {
     const fileList = document.getElementById('gpxFileList');
     const button = document.getElementById('toggleFileList');
     fileList.classList.add('hidden');
     button.textContent = 'Show Files';
 });
-
