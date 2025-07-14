@@ -13,10 +13,27 @@
 </head>
 <body>
     <div class="controls">
+        <div class="file-upload-wrapper">
+            <input type="file" id="gpxFileInput" accept=".gpx" multiple style="display: none;">
+            <button id="uploadGpx" class="control-btn">Upload GPX</button>
+        </div>
         <button id="addStartLine" class="control-btn">Add Start Line</button>
         <button id="addFinishLine" class="control-btn">Add Finish Line</button>
         <button id="clearLines" class="control-btn">Clear Lines</button>
+        <button id="clearAllGpx" class="control-btn">Clear All GPX</button>
+        <button id="toggleFileList" class="control-btn">Show Files</button>
     </div>
+    
+    <div id="gpxFileList" class="gpx-file-list hidden">
+        <div class="file-list-header">
+            <h3>Loaded GPX Files</h3>
+            <button id="closeFileList" class="close-btn">&times;</button>
+        </div>
+        <div id="fileListContent" class="file-list-content">
+            <p class="no-files">No GPX files loaded</p>
+        </div>
+    </div>
+    
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
