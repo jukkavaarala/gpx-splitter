@@ -7,14 +7,23 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""/>
+    <!-- Leaflet Draw plugin for drawing lines -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="controls">
+        <button id="addStartLine" class="control-btn">Add Start Line</button>
+        <button id="addFinishLine" class="control-btn">Add Finish Line</button>
+        <button id="clearLines" class="control-btn">Clear Lines</button>
+    </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
+    <!-- Leaflet Draw plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
