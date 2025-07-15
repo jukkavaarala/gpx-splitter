@@ -148,19 +148,101 @@ function checkLineIntersection(track, line) {
     return null;
 }
 
+// Function to calculate precise intersection point between track and line
+function calculateLineIntersectionPoint(track, line, nearestPointIndex) {
+    if (!line || !track.points || nearestPointIndex >= track.points.length) {
+        return null;
+    }
+
+    const lineLatLngs = line.line.getLatLngs();
+    const lineStart = lineLatLngs[0];
+    const lineEnd = lineLatLngs[1];
+    
+    // Get the nearest point and adjacent points for interpolation
+    const point = track.points[nearestPointIndex];
+    
+    // Try to find a better intersection by checking adjacent segments
+    let bestIntersection = { lat: point.lat, lng: point.lng };
+    let bestDistance = distanceToLineSegment(point, lineStart, lineEnd);
+    
+    // Check previous segment
+    if (nearestPointIndex > 0) {
+        const prevPoint = track.points[nearestPointIndex - 1];
+        const intersection = lineSegmentIntersection(
+            prevPoint, point,
+            lineStart, lineEnd
+        );
+        if (intersection) {
+            const distance = distanceToLineSegment(intersection, lineStart, lineEnd);
+            if (distance < bestDistance) {
+                bestIntersection = intersection;
+                bestDistance = distance;
+            }
+        }
+    }
+    
+    // Check next segment
+    if (nearestPointIndex < track.points.length - 1) {
+        const nextPoint = track.points[nearestPointIndex + 1];
+        const intersection = lineSegmentIntersection(
+            point, nextPoint,
+            lineStart, lineEnd
+        );
+        if (intersection) {
+            const distance = distanceToLineSegment(intersection, lineStart, lineEnd);
+            if (distance < bestDistance) {
+                bestIntersection = intersection;
+                bestDistance = distance;
+            }
+        }
+    }
+    
+    return bestIntersection;
+}
+
+// Function to find intersection between two line segments
+function lineSegmentIntersection(p1, p2, p3, p4) {
+    const x1 = p1.lng, y1 = p1.lat;
+    const x2 = p2.lng, y2 = p2.lat;
+    const x3 = p3.lng, y3 = p3.lat;
+    const x4 = p4.lng, y4 = p4.lat;
+    
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-10) return null; // Lines are parallel
+    
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+    
+    // Check if intersection is within both line segments
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        return {
+            lat: y1 + t * (y2 - y1),
+            lng: x1 + t * (x2 - x1)
+        };
+    }
+    
+    return null;
+}
+
 function findTrackSegment(track, startLine, finishLine) {
     const startIntersection = startLine ? checkLineIntersection(track, startLine) : null;
     const finishIntersection = finishLine ? checkLineIntersection(track, finishLine) : null;
     
     let startIndex = 0;
     let endIndex = track.points.length - 1;
+    let interpolatedStart = null;
+    let interpolatedEnd = null;
     
     if (startIntersection) {
         startIndex = startIntersection.pointIndex;
+        // Calculate interpolated position on the start line
+        interpolatedStart = calculateLineIntersectionPoint(track, startLine, startIntersection.pointIndex);
     }
     
     if (finishIntersection) {
         endIndex = finishIntersection.pointIndex;
+        // Calculate interpolated position on the finish line
+        interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishIntersection.pointIndex);
     }
     
     // Ensure start comes before finish
@@ -170,6 +252,9 @@ function findTrackSegment(track, startLine, finishLine) {
             const temp = startIndex;
             startIndex = endIndex;
             endIndex = temp;
+            const tempInterpolated = interpolatedStart;
+            interpolatedStart = interpolatedEnd;
+            interpolatedEnd = tempInterpolated;
         }
     }
     
@@ -178,7 +263,9 @@ function findTrackSegment(track, startLine, finishLine) {
         endIndex: endIndex,
         hasStartLine: !!startIntersection,
         hasFinishLine: !!finishIntersection,
-        totalPoints: endIndex - startIndex + 1
+        totalPoints: endIndex - startIndex + 1,
+        interpolatedStart: interpolatedStart,
+        interpolatedEnd: interpolatedEnd
     };
 }
 
@@ -186,12 +273,27 @@ function findTrackSegment(track, startLine, finishLine) {
 function createLine(point1, point2, style, label) {
     const line = L.polyline([point1, point2], style).addTo(linesGroup);
     
-    // Add label at the center of the line
-    const center = [(point1.lat + point2.lat) / 2, (point1.lng + point2.lng) / 2];
-    const marker = L.marker(center, {
+    // Calculate line center and perpendicular offset
+    const centerLat = (point1.lat + point2.lat) / 2;
+    const centerLng = (point1.lng + point2.lng) / 2;
+    
+    // Calculate perpendicular direction to offset the label
+    const deltaLat = point2.lat - point1.lat;
+    const deltaLng = point2.lng - point1.lng;
+    const lineLength = Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
+    
+    // Normalize perpendicular vector and apply offset
+    const offsetDistance = 0.0005; // Adjust this value to change offset distance
+    const perpLat = -deltaLng / lineLength * offsetDistance;
+    const perpLng = deltaLat / lineLength * offsetDistance;
+    
+    // Position label offset from line center
+    const labelPosition = [centerLat + perpLat, centerLng + perpLng];
+    
+    const marker = L.marker(labelPosition, {
         icon: L.divIcon({
             className: 'line-label',
-            html: `<div style="background: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold; border: 2px solid ${style.color}; color: ${style.color};">${label}</div>`,
+            html: `<div style="background: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold; border: 2px solid ${style.color}; color: ${style.color}; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">${label}</div>`,
             iconSize: [60, 20],
             iconAnchor: [30, 10]
         })
@@ -724,7 +826,8 @@ let playbackState = {
     speed: 1,
     lastUpdateTime: 0,
     maxPoints: 0, // Maximum points across all tracks
-    pauseStartTime: 0 // When pause was initiated
+    pauseStartTime: 0, // When pause was initiated
+    smoothInterpolation: true // Default to smooth playback
 };
 
 const playbackLayer = L.layerGroup().addTo(map);
@@ -758,7 +861,14 @@ function prepareTracksForPlayback() {
                         segmentPoints: segment.totalPoints,
                         startTime: null, // Real playback start time
                         trackStartTime: null, // Track's first timestamp
-                        pausedTime: 0 // Total time spent paused
+                        pausedTime: 0, // Total time spent paused
+                        interpolatedStart: segment.interpolatedStart,
+                        interpolatedEnd: segment.interpolatedEnd,
+                        usingInterpolatedStart: false, // Flag to track if we're using interpolated start
+                        // Smooth interpolation properties
+                        currentPosition: null, // Current interpolated position
+                        targetPosition: null, // Target position to move towards
+                        interpolationProgress: 0 // Progress between current and target (0-1)
                     };
                     
                     tracks.push(trackData);
@@ -825,6 +935,50 @@ function createTrackPlaybackMarker(track, lat, lng) {
     return track.marker;
 }
 
+// Function to interpolate between two geographic points
+function interpolatePosition(pos1, pos2, progress) {
+    if (!pos1 || !pos2) return pos1 || pos2;
+    
+    // Linear interpolation between two lat/lng points
+    return {
+        lat: pos1.lat + (pos2.lat - pos1.lat) * progress,
+        lng: pos1.lng + (pos2.lng - pos1.lng) * progress
+    };
+}
+
+// Function to update track position with smooth interpolation
+function updateTrackPosition(track) {
+    if (!playbackState.smoothInterpolation) {
+        // Jump mode - use exact GPS point positions
+        const currentPoint = track.points[track.currentPointIndex];
+        if (track.usingInterpolatedStart && track.interpolatedStart) {
+            return track.interpolatedStart;
+        }
+        return { lat: currentPoint.lat, lng: currentPoint.lng };
+    }
+    
+    // Smooth interpolation mode
+    if (!track.currentPosition) {
+        // Initialize position
+        const currentPoint = track.points[track.currentPointIndex];
+        if (track.usingInterpolatedStart && track.interpolatedStart) {
+            track.currentPosition = { ...track.interpolatedStart };
+            track.targetPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
+        } else {
+            track.currentPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
+            const nextPoint = track.points[track.currentPointIndex + 1];
+            if (nextPoint) {
+                track.targetPosition = { lat: nextPoint.lat, lng: nextPoint.lng };
+            }
+        }
+        track.interpolationProgress = 0;
+        return track.currentPosition;
+    }
+    
+    // Return interpolated position
+    return interpolatePosition(track.currentPosition, track.targetPosition, track.interpolationProgress);
+}
+
 // Function to update playback progress based on realtime progress
 function updatePlaybackProgress() {
     if (playbackState.tracks.length === 0) return;
@@ -883,26 +1037,80 @@ function animateSimultaneousPlayback() {
             let shouldAdvance = false;
             
             if (track.startTime === null) {
-                // First point - initialize timing
+                // First point - initialize timing and position
                 track.startTime = now;
-                track.trackStartTime = currentPoint.time ? new Date(currentPoint.time).getTime() : null;
-                shouldAdvance = true;
-            } else if (nextPoint && nextPoint.time && track.trackStartTime) {
-                // Calculate elapsed time in track vs real playback time
-                const nextPointTime = new Date(nextPoint.time).getTime();
-                const trackElapsed = nextPointTime - track.trackStartTime;
-                const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
                 
-                shouldAdvance = realElapsed >= trackElapsed;
+                // Initialize position based on interpolation mode
+                const position = updateTrackPosition(track);
+                createTrackPlaybackMarker(track, position.lat, position.lng);
+                
+                // Set flags based on start line
+                if (track.interpolatedStart && track.hasStartLine) {
+                    track.usingInterpolatedStart = true;
+                } else {
+                    track.usingInterpolatedStart = false;
+                }
+                
+                track.trackStartTime = track.points[track.currentPointIndex].time ? 
+                    new Date(track.points[track.currentPointIndex].time).getTime() : null;
+                hasActiveMarkers = true;
+            } else if (track.trackStartTime && currentPoint.time) {
+                // Calculate elapsed time in track vs real playback time
+                let targetTime;
+                
+                if (track.usingInterpolatedStart) {
+                    // When using interpolated start, add a small delay before moving to first GPS point
+                    // This ensures the interpolated position is visible for a moment
+                    const interpolatedDelay = 500; // 0.5 second delay at start line
+                    const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                    
+                    if (realElapsed >= interpolatedDelay) {
+                        // After delay, transition to first GPS point
+                        shouldAdvance = true;
+                    } else {
+                        // Still showing interpolated start
+                        hasActiveMarkers = true;
+                    }
+                } else if (nextPoint && nextPoint.time) {
+                    // Normal advancement - use next point's time
+                    targetTime = new Date(nextPoint.time).getTime();
+                    const trackElapsed = targetTime - track.trackStartTime;
+                    const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                    shouldAdvance = realElapsed >= trackElapsed;
+                } else {
+                    // No next point timing available, don't advance yet
+                    hasActiveMarkers = true;
+                }
             } else {
                 // No timestamp data, fall back to regular interval
                 const interval = 1000 / playbackState.speed; // 1 second intervals
                 shouldAdvance = deltaTime >= interval;
+                hasActiveMarkers = true;
             }
             
-            if (shouldAdvance) {
-                createTrackPlaybackMarker(track, currentPoint.lat, currentPoint.lng);
-                track.currentPointIndex++;
+            if (shouldAdvance && track.startTime !== null) {
+                if (track.usingInterpolatedStart) {
+                    // Transition from interpolated start to first actual GPS point
+                    if (playbackState.smoothInterpolation) {
+                        track.currentPosition = { ...track.interpolatedStart };
+                        track.targetPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
+                        track.interpolationProgress = 0;
+                    }
+                    track.usingInterpolatedStart = false;
+                } else {
+                    // Normal advancement - move to the next point
+                    track.currentPointIndex++;
+                    if (track.currentPointIndex <= track.endIndex && track.currentPointIndex < track.points.length) {
+                        const nextGpsPoint = track.points[track.currentPointIndex];
+                        if (playbackState.smoothInterpolation && track.currentPosition) {
+                            // Update interpolation targets
+                            track.currentPosition = { ...track.targetPosition };
+                            track.targetPosition = { lat: nextGpsPoint.lat, lng: nextGpsPoint.lng };
+                            track.interpolationProgress = 0;
+                        }
+                    }
+                }
+                
                 hasActiveMarkers = true;
                 
                 // Mark track as complete if we've reached the end of the segment
@@ -910,13 +1118,28 @@ function animateSimultaneousPlayback() {
                     track.isComplete = true;
                     console.log(`Track ${track.trackName} completed at point ${track.currentPointIndex}`);
                 }
+            } else if (playbackState.smoothInterpolation && track.currentPosition && track.targetPosition) {
+                // Update interpolation progress for smooth movement
+                const frameTime = deltaTime / 1000; // Convert to seconds
+                const interpolationSpeed = playbackState.speed; // Adjust for smooth movement
+                track.interpolationProgress = Math.min(1, track.interpolationProgress + frameTime * interpolationSpeed);
+                hasActiveMarkers = true;
             } else {
                 hasActiveMarkers = true; // Still has points to process
+            }
+            
+            // Update marker position
+            if (track.currentPosition || !playbackState.smoothInterpolation) {
+                const position = updateTrackPosition(track);
+                if (position) {
+                    createTrackPlaybackMarker(track, position.lat, position.lng);
+                }
             }
         }
     });
     
     updatePlaybackProgress();
+    updateMapViewForPlayback(); // Follow the playback markers
     
     if (!hasActiveMarkers) {
         // All tracks completed
@@ -976,6 +1199,11 @@ function startPlayback() {
         track.startTime = null;
         track.trackStartTime = null;
         track.pausedTime = 0;
+        track.usingInterpolatedStart = false;
+        // Reset interpolation state
+        track.currentPosition = null;
+        track.targetPosition = null;
+        track.interpolationProgress = 0;
     });
     
     playbackState.tracks = tracks;
@@ -1081,11 +1309,20 @@ function stopPlayback() {
             playbackLayer.removeLayer(track.marker);
             track.marker = null;
         }
-        track.currentPointIndex = track.startIndex;
-        track.isComplete = false;
-        track.startTime = null;
-        track.trackStartTime = null;
-        track.pausedTime = 0;
+    track.currentPointIndex = track.startIndex;
+    track.isComplete = false;
+    track.startTime = null;
+    track.trackStartTime = null;
+    track.pausedTime = 0;
+    track.usingInterpolatedStart = false;
+    // Reset interpolation state
+    track.currentPosition = null;
+    track.targetPosition = null;
+    track.interpolationProgress = 0;
+        // Reset interpolation state
+        track.currentPosition = null;
+        track.targetPosition = null;
+        track.interpolationProgress = 0;
     });
     
     playbackState.pauseStartTime = 0;
@@ -1124,15 +1361,58 @@ function seekToPosition(percent) {
         track.startTime = null;
         track.trackStartTime = null;
         track.pausedTime = 0;
+        track.usingInterpolatedStart = false;
         
         // Update marker position if track has points
         if (track.points.length > 0 && track.currentPointIndex < track.points.length) {
-            const point = track.points[track.currentPointIndex];
-            createTrackPlaybackMarker(track, point.lat, point.lng);
+            // Use interpolated start position if seeking to the beginning and start line exists
+            if (percent === 0 && track.interpolatedStart && track.hasStartLine) {
+                createTrackPlaybackMarker(track, track.interpolatedStart.lat, track.interpolatedStart.lng);
+                track.usingInterpolatedStart = true; // Set this flag when showing interpolated start
+            } else {
+                const point = track.points[track.currentPointIndex];
+                createTrackPlaybackMarker(track, point.lat, point.lng);
+            }
         }
     });
     
     updatePlaybackProgress();
+}
+
+// Function to update map view to follow playback markers
+function updateMapViewForPlayback() {
+    if (playbackState.tracks.length === 0) return;
+    
+    // Get all active marker positions
+    const activeMarkers = playbackState.tracks
+        .filter(track => track.marker && !track.isComplete)
+        .map(track => track.marker.getLatLng());
+    
+    if (activeMarkers.length === 0) return;
+    
+    // Calculate bounds of all active markers
+    const bounds = L.latLngBounds(activeMarkers);
+    
+    // Get current map bounds
+    const currentBounds = map.getBounds();
+    
+    // Check if all markers are already visible in current view
+    const allMarkersVisible = activeMarkers.every(markerPos => 
+        currentBounds.contains(markerPos)
+    );
+    
+    if (allMarkersVisible) {
+        // All markers are visible, just pan to center without changing zoom
+        const center = bounds.getCenter();
+        map.panTo(center, { animate: true, duration: 0.5 });
+    } else {
+        // Some markers are outside view, fit bounds with padding
+        map.fitBounds(bounds, { 
+            padding: [50, 50], 
+            animate: true, 
+            duration: 0.5 
+        });
+    }
 }
 
 // Event listeners for playback controls
@@ -1176,6 +1456,20 @@ document.getElementById('playbackSpeed').addEventListener('change', function() {
     
     playbackState.speed = newSpeed;
     console.log(`Playback speed changed to ${playbackState.speed}x`);
+});
+
+// Add event listener for smooth interpolation checkbox
+document.getElementById('smoothInterpolation').addEventListener('change', function() {
+    playbackState.smoothInterpolation = this.checked;
+    
+    // Reset all track interpolation states when changing modes
+    if (playbackState.tracks) {
+        playbackState.tracks.forEach(track => {
+            track.currentPosition = null;
+            track.targetPosition = null;
+            track.interpolationProgress = 0;
+        });
+    }
 });
 
 document.getElementById('progressSlider').addEventListener('input', function() {
