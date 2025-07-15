@@ -723,7 +723,8 @@ let playbackState = {
     animationId: null,
     speed: 1,
     lastUpdateTime: 0,
-    maxPoints: 0 // Maximum points across all tracks
+    maxPoints: 0, // Maximum points across all tracks
+    pauseStartTime: 0 // When pause was initiated
 };
 
 const playbackLayer = L.layerGroup().addTo(map);
@@ -754,7 +755,10 @@ function prepareTracksForPlayback() {
                         isComplete: false,
                         hasStartLine: segment.hasStartLine,
                         hasFinishLine: segment.hasFinishLine,
-                        segmentPoints: segment.totalPoints
+                        segmentPoints: segment.totalPoints,
+                        startTime: null, // Real playback start time
+                        trackStartTime: null, // Track's first timestamp
+                        pausedTime: 0 // Total time spent paused
                     };
                     
                     tracks.push(trackData);
@@ -788,6 +792,21 @@ function createTrackPlaybackMarker(track, lat, lng) {
     // Add popup with current point info
     const point = track.points[track.currentPointIndex];
     const progressInSegment = track.currentPointIndex - track.startIndex + 1;
+    
+    // Calculate timing information if available
+    let timingInfo = '';
+    if (point.time && track.trackStartTime && track.startTime) {
+        const pointTime = new Date(point.time);
+        const elapsedSeconds = (pointTime.getTime() - track.trackStartTime) / 1000;
+        const hours = Math.floor(elapsedSeconds / 3600);
+        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const seconds = Math.floor(elapsedSeconds % 60);
+        const timeStr = hours > 0 ? 
+            `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}` :
+            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        timingInfo = `<p><strong>Track Time:</strong> ${timeStr}</p>`;
+    }
+    
     track.marker.bindPopup(`
         <div>
             <h4>${track.trackName}</h4>
@@ -796,8 +815,9 @@ function createTrackPlaybackMarker(track, lat, lng) {
             <p><strong>Total Point:</strong> ${track.currentPointIndex + 1} / ${track.points.length}</p>
             ${track.hasStartLine ? '<p><span style="color: #28a745;">⚑ Started from start line</span></p>' : ''}
             ${track.hasFinishLine ? '<p><span style="color: #dc3545;">🏁 Will stop at finish line</span></p>' : ''}
+            ${timingInfo}
             ${point.elevation ? `<p><strong>Elevation:</strong> ${point.elevation}m</p>` : ''}
-            ${point.time ? `<p><strong>Time:</strong> ${new Date(point.time).toLocaleString()}</p>` : ''}
+            ${point.time ? `<p><strong>Timestamp:</strong> ${new Date(point.time).toLocaleString()}</p>` : ''}
             <p><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
         </div>
     `);
@@ -805,11 +825,11 @@ function createTrackPlaybackMarker(track, lat, lng) {
     return track.marker;
 }
 
-// Function to update playback progress based on segment progress
+// Function to update playback progress based on realtime progress
 function updatePlaybackProgress() {
     if (playbackState.tracks.length === 0) return;
     
-    // Calculate progress based on segment completion
+    // Calculate progress based on time elapsed vs total track duration
     let maxProgress = 0;
     let totalSegmentPoints = 0;
     let currentSegmentPoints = 0;
@@ -827,33 +847,22 @@ function updatePlaybackProgress() {
     
     document.getElementById('progressFill').style.width = progressPercent + '%';
     document.getElementById('progressSlider').value = progressPercent;
-    document.getElementById('progressText').textContent = 
-        `${Math.round(progressPercent)}% (${currentSegmentPoints} / ${totalSegmentPoints} segment points)`;
+    
+    // Show timing information if available
+    const hasTimingData = playbackState.tracks.some(track => 
+        track.points[track.startIndex]?.time && track.points[track.endIndex]?.time
+    );
+    
+    if (hasTimingData) {
+        document.getElementById('progressText').textContent = 
+            `${Math.round(progressPercent)}% (realtime playback - ${currentSegmentPoints} / ${totalSegmentPoints} points)`;
+    } else {
+        document.getElementById('progressText').textContent = 
+            `${Math.round(progressPercent)}% (${currentSegmentPoints} / ${totalSegmentPoints} segment points)`;
+    }
 }
 
-// Function to update all track markers simultaneously
-function updateAllTrackMarkers() {
-    let hasActiveMarkers = false;
-    
-    playbackState.tracks.forEach(track => {
-        if (!track.isComplete && track.currentPointIndex <= track.endIndex) {
-            const point = track.points[track.currentPointIndex];
-            createTrackPlaybackMarker(track, point.lat, point.lng);
-            track.currentPointIndex++;
-            hasActiveMarkers = true;
-            
-            // Mark track as complete if we've reached the end of the segment
-            if (track.currentPointIndex > track.endIndex) {
-                track.isComplete = true;
-                console.log(`Track ${track.trackName} completed at point ${track.currentPointIndex}`);
-            }
-        }
-    });
-    
-    return hasActiveMarkers;
-}
-
-// Animation function for simultaneous playback
+// Animation function for realtime simultaneous playback
 function animateSimultaneousPlayback() {
     if (!playbackState.isPlaying || playbackState.isPaused) {
         return;
@@ -861,22 +870,61 @@ function animateSimultaneousPlayback() {
     
     const now = Date.now();
     const deltaTime = now - playbackState.lastUpdateTime;
-    const baseInterval = 100; // Base interval in milliseconds
-    const adjustedInterval = baseInterval / playbackState.speed;
     
-    if (deltaTime >= adjustedInterval) {
-        const hasActiveMarkers = updateAllTrackMarkers();
-        updatePlaybackProgress();
-        
-        if (!hasActiveMarkers) {
-            // All tracks completed
-            stopPlayback();
-            return;
+    // Update tracks based on realtime timestamps
+    let hasActiveMarkers = false;
+    
+    playbackState.tracks.forEach(track => {
+        if (!track.isComplete && track.currentPointIndex <= track.endIndex) {
+            const currentPoint = track.points[track.currentPointIndex];
+            const nextPoint = track.points[track.currentPointIndex + 1];
+            
+            // Check if it's time to advance to the next point
+            let shouldAdvance = false;
+            
+            if (track.startTime === null) {
+                // First point - initialize timing
+                track.startTime = now;
+                track.trackStartTime = currentPoint.time ? new Date(currentPoint.time).getTime() : null;
+                shouldAdvance = true;
+            } else if (nextPoint && nextPoint.time && track.trackStartTime) {
+                // Calculate elapsed time in track vs real playback time
+                const nextPointTime = new Date(nextPoint.time).getTime();
+                const trackElapsed = nextPointTime - track.trackStartTime;
+                const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                
+                shouldAdvance = realElapsed >= trackElapsed;
+            } else {
+                // No timestamp data, fall back to regular interval
+                const interval = 1000 / playbackState.speed; // 1 second intervals
+                shouldAdvance = deltaTime >= interval;
+            }
+            
+            if (shouldAdvance) {
+                createTrackPlaybackMarker(track, currentPoint.lat, currentPoint.lng);
+                track.currentPointIndex++;
+                hasActiveMarkers = true;
+                
+                // Mark track as complete if we've reached the end of the segment
+                if (track.currentPointIndex > track.endIndex) {
+                    track.isComplete = true;
+                    console.log(`Track ${track.trackName} completed at point ${track.currentPointIndex}`);
+                }
+            } else {
+                hasActiveMarkers = true; // Still has points to process
+            }
         }
-        
-        playbackState.lastUpdateTime = now;
+    });
+    
+    updatePlaybackProgress();
+    
+    if (!hasActiveMarkers) {
+        // All tracks completed
+        stopPlayback();
+        return;
     }
     
+    playbackState.lastUpdateTime = now;
     playbackState.animationId = requestAnimationFrame(animateSimultaneousPlayback);
 }
 
@@ -893,6 +941,7 @@ function startPlayback() {
     let statusMessage = `Playing ${tracks.length} track${tracks.length !== 1 ? 's' : ''} simultaneously`;
     let hasStartOrFinish = false;
     
+    // Check if start/finish lines are defined and add that info
     if (startLine || finishLine) {
         let lineInfo = [];
         if (startLine) {
@@ -903,7 +952,20 @@ function startPlayback() {
             lineInfo.push('finish line');
             hasStartOrFinish = true;
         }
-        statusMessage += ` (using ${lineInfo.join(' and ')})`;
+        statusMessage += ` + ${lineInfo.join(' and ')}`;
+    }
+    
+    // Check if tracks have timing data
+    const hasTimingData = tracks.some(track => 
+        track.points[track.startIndex]?.time && track.points[track.endIndex]?.time
+    );
+    
+    if (hasTimingData) {
+        statusMessage += ' (realtime timing)';
+        console.log('Realtime playback enabled - using GPX timestamps');
+    } else {
+        statusMessage += ' (no timing data - using intervals)';
+        console.log('No timing data available - using interval-based playback');
     }
     
     // Reset all tracks to their start positions
@@ -911,6 +973,9 @@ function startPlayback() {
         track.currentPointIndex = track.startIndex;
         track.isComplete = false;
         track.marker = null;
+        track.startTime = null;
+        track.trackStartTime = null;
+        track.pausedTime = 0;
     });
     
     playbackState.tracks = tracks;
@@ -948,6 +1013,7 @@ function startPlayback() {
 // Function to pause playback
 function pausePlayback() {
     playbackState.isPaused = true;
+    playbackState.pauseStartTime = Date.now();
     
     if (playbackState.animationId) {
         cancelAnimationFrame(playbackState.animationId);
@@ -973,6 +1039,15 @@ function resumePlayback() {
         stopPlayback();
         startPlayback();
         return;
+    }
+    
+    // Add the paused time to all tracks
+    if (playbackState.pauseStartTime > 0) {
+        const pauseDuration = Date.now() - playbackState.pauseStartTime;
+        playbackState.tracks.forEach(track => {
+            track.pausedTime += pauseDuration;
+        });
+        playbackState.pauseStartTime = 0;
     }
     
     playbackState.isPaused = false;
@@ -1008,7 +1083,12 @@ function stopPlayback() {
         }
         track.currentPointIndex = track.startIndex;
         track.isComplete = false;
+        track.startTime = null;
+        track.trackStartTime = null;
+        track.pausedTime = 0;
     });
+    
+    playbackState.pauseStartTime = 0;
     
     // Reset track count info
     let statusMessage = 'Simultaneous playback ready';
@@ -1039,6 +1119,11 @@ function seekToPosition(percent) {
         
         track.currentPointIndex = Math.max(track.startIndex, Math.min(targetIndex, track.endIndex));
         track.isComplete = track.currentPointIndex >= track.endIndex;
+        
+        // Reset timing when seeking
+        track.startTime = null;
+        track.trackStartTime = null;
+        track.pausedTime = 0;
         
         // Update marker position if track has points
         if (track.points.length > 0 && track.currentPointIndex < track.points.length) {
@@ -1071,7 +1156,25 @@ document.getElementById('closePlayback').addEventListener('click', function() {
 });
 
 document.getElementById('playbackSpeed').addEventListener('change', function() {
-    playbackState.speed = parseFloat(this.value);
+    const newSpeed = parseFloat(this.value);
+    
+    // If playback is active, adjust timing to maintain current position
+    if (playbackState.isPlaying && !playbackState.isPaused && playbackState.tracks.length > 0) {
+        const now = Date.now();
+        
+        playbackState.tracks.forEach(track => {
+            if (track.startTime && track.trackStartTime) {
+                // Calculate current progress with old speed
+                const currentRealElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                
+                // Adjust start time to maintain the same progress with new speed
+                const newStartTime = now - (currentRealElapsed / newSpeed) - track.pausedTime;
+                track.startTime = newStartTime;
+            }
+        });
+    }
+    
+    playbackState.speed = newSpeed;
     console.log(`Playback speed changed to ${playbackState.speed}x`);
 });
 
