@@ -610,3 +610,30 @@ body {
         font-size: 10px;
     }
 }
+
+/* General utility classes */
+.hidden {
+    display: none !important;
+}
+
+#cropGpxFiles {
+    background: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+
+#cropGpxFiles:hover {
+    background: #e0a800;
+    border-color: #d39e00;
+}
+
+#undoCrop {
+    background: #fd7e14;
+    color: white;
+    border-color: #fd7e14;
+}
+
+#undoCrop:hover {
+    background: #e66100;
+    border-color: #d39e00;
+}

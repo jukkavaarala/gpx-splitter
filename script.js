@@ -52,6 +52,9 @@ const linesGroup = L.layerGroup().addTo(map);
 let gpxFiles = new Map(); // Map<fileId, {data, layers, visible, color, fileName}>
 let nextFileId = 1;
 
+// Backup storage for undo functionality
+let gpxFilesBackup = null;
+
 // Line styles
 const startLineStyle = {
     color: '#28a745',
@@ -474,43 +477,14 @@ function createGpxLayers(gpxData, color, fileName) {
 
 // Function to add GPX file
 function addGpxFile(fileName, gpxData) {
-    const fileId = nextFileId++;
-    const color = generateColor(gpxFiles.size);
-    const { layers, totalPoints } = createGpxLayers(gpxData, color, fileName);
-    
-    // Add layers to map
-    layers.forEach(layer => layer.addTo(map));
-    
-    // Store file data
-    gpxFiles.set(fileId, {
-        data: gpxData,
-        layers: layers,
-        visible: true,
-        color: color,
-        fileName: fileName,
-        totalPoints: totalPoints
-    });
-    
-    updateFileList();
-    updateMapBounds();
-    
-    console.log(`Added GPX file: ${fileName} (${totalPoints} points)`);
-    return fileId;
+    return addGpxFileInternal(fileName, gpxData);
 }
 
 // Function to remove GPX file
 function removeGpxFile(fileId) {
-    const file = gpxFiles.get(fileId);
-    if (file) {
-        // Remove layers from map
-        file.layers.forEach(layer => map.removeLayer(layer));
-        
-        // Remove from storage
-        gpxFiles.delete(fileId);
-        
-        updateFileList();
-        console.log(`Removed GPX file: ${file.fileName}`);
-    }
+    removeGpxFileInternal(fileId);
+    updateFileList();
+    console.log(`Removed GPX file with ID: ${fileId}`);
 }
 
 // Function to toggle GPX file visibility
@@ -761,6 +735,14 @@ document.getElementById('addFinishLine').addEventListener('click', function() {
 
 document.getElementById('clearLines').addEventListener('click', function() {
     clearAllLines();
+});
+
+document.getElementById('cropGpxFiles').addEventListener('click', function() {
+    cropAllGpxFiles();
+});
+
+document.getElementById('undoCrop').addEventListener('click', function() {
+    undoCrop();
 });
 
 // Map click handler for drawing lines
@@ -1505,3 +1487,205 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+// Function to crop all GPX files
+function cropAllGpxFiles() {
+    if (!startLine && !finishLine) {
+        alert('Please set at least one line (start or finish) before cropping.');
+        return;
+    }
+    
+    if (gpxFiles.size === 0) {
+        alert('No GPX files to crop. Please load some GPX files first.');
+        return;
+    }
+    
+    // Create backup before cropping
+    createBackup();
+    
+    let croppedCount = 0;
+    const filesToRemove = [];
+    const filesToAdd = [];
+    
+    gpxFiles.forEach((file, fileId) => {
+        if (file.data.tracks.length > 0) {
+            const croppedGpxData = cropGpxData(file.data, file.fileName);
+            if (croppedGpxData) {
+                filesToRemove.push(fileId);
+                filesToAdd.push({
+                    fileName: file.fileName,
+                    gpxData: croppedGpxData,
+                    originalColor: file.color,
+                    wasVisible: file.visible
+                });
+                croppedCount++;
+            }
+        }
+    });
+    
+    if (croppedCount === 0) {
+        alert('No tracks found that intersect with the defined lines.');
+        return;
+    }
+    
+    // Remove original files and add cropped versions
+    filesToRemove.forEach(fileId => {
+        removeGpxFileInternal(fileId);
+    });
+    
+    // Add cropped files with original colors and visibility
+    filesToAdd.forEach(fileData => {
+        const newFileId = addGpxFileInternal(fileData.fileName, fileData.gpxData, fileData.originalColor);
+        if (!fileData.wasVisible) {
+            toggleGpxFile(newFileId);
+        }
+    });
+    
+    // Show undo button
+    document.getElementById('undoCrop').classList.remove('hidden');
+    
+    alert(`Successfully cropped ${croppedCount} GPX file(s). Use "Undo Crop" to restore original files.`);
+}
+
+// Function to create backup of current state
+function createBackup() {
+    gpxFilesBackup = new Map();
+    gpxFiles.forEach((file, fileId) => {
+        gpxFilesBackup.set(fileId, {
+            data: JSON.parse(JSON.stringify(file.data)), // Deep copy
+            visible: file.visible,
+            color: file.color,
+            fileName: file.fileName,
+            totalPoints: file.totalPoints
+        });
+    });
+}
+
+// Function to undo crop
+function undoCrop() {
+    if (!gpxFilesBackup) {
+        alert('No backup available to restore.');
+        return;
+    }
+    
+    // Clear current files
+    const currentFileIds = Array.from(gpxFiles.keys());
+    currentFileIds.forEach(fileId => {
+        removeGpxFileInternal(fileId);
+    });
+    
+    // Restore from backup
+    gpxFilesBackup.forEach((file, fileId) => {
+        const newFileId = addGpxFileInternal(file.fileName, file.data, file.color);
+        if (!file.visible) {
+            toggleGpxFile(newFileId);
+        }
+    });
+    
+    // Clear backup and hide undo button
+    gpxFilesBackup = null;
+    document.getElementById('undoCrop').classList.add('hidden');
+    
+    alert('Successfully restored original GPX files.');
+}
+
+// Internal function to remove GPX file without updating UI multiple times
+function removeGpxFileInternal(fileId) {
+    const file = gpxFiles.get(fileId);
+    if (file) {
+        // Remove layers from map
+        file.layers.forEach(layer => map.removeLayer(layer));
+        
+        // Remove from storage
+        gpxFiles.delete(fileId);
+    }
+}
+
+// Internal function to add GPX file with specified color
+function addGpxFileInternal(fileName, gpxData, color = null) {
+    const fileId = nextFileId++;
+    const fileColor = color || generateColor(gpxFiles.size);
+    const { layers, totalPoints } = createGpxLayers(gpxData, fileColor, fileName);
+    
+    // Add layers to map
+    layers.forEach(layer => layer.addTo(map));
+    
+    // Store file data
+    gpxFiles.set(fileId, {
+        data: gpxData,
+        layers: layers,
+        visible: true,
+        color: fileColor,
+        fileName: fileName,
+        totalPoints: totalPoints
+    });
+    
+    updateFileList();
+    updateMapBounds();
+    
+    console.log(`Added GPX file: ${fileName} (${totalPoints} points)`);
+    return fileId;
+}
+
+// Function to crop GPX data based on start and finish lines
+function cropGpxData(gpxData, fileName) {
+    const croppedTracks = [];
+    let hasValidTracks = false;
+    
+    gpxData.tracks.forEach((track, trackIndex) => {
+        if (track.points.length > 0) {
+            const segment = findTrackSegment(track, startLine, finishLine);
+            
+            // Only include tracks that have intersections with at least one line
+            if (segment.hasStartLine || segment.hasFinishLine) {
+                const croppedPoints = [];
+                
+                // Add interpolated start point if we have a start line intersection
+                if (segment.interpolatedStart) {
+                    croppedPoints.push({
+                        lat: segment.interpolatedStart.lat,
+                        lng: segment.interpolatedStart.lng,
+                        elevation: track.points[segment.startIndex]?.elevation || null,
+                        time: track.points[segment.startIndex]?.time || null
+                    });
+                }
+                
+                // Add the track points between start and end
+                for (let i = segment.startIndex; i <= segment.endIndex; i++) {
+                    croppedPoints.push(track.points[i]);
+                }
+                
+                // Add interpolated end point if we have a finish line intersection
+                if (segment.interpolatedEnd) {
+                    croppedPoints.push({
+                        lat: segment.interpolatedEnd.lat,
+                        lng: segment.interpolatedEnd.lng,
+                        elevation: track.points[segment.endIndex]?.elevation || null,
+                        time: track.points[segment.endIndex]?.time || null
+                    });
+                }
+                
+                if (croppedPoints.length > 1) {
+                    croppedTracks.push({
+                        name: track.name,
+                        segment: track.segment,
+                        points: croppedPoints
+                    });
+                    hasValidTracks = true;
+                }
+            }
+        }
+    });
+    
+    if (!hasValidTracks) {
+        return null;
+    }
+    
+    return {
+        tracks: croppedTracks,
+        routes: [], // Don't include routes in cropped files
+        waypoints: [] // Don't include waypoints in cropped files
+    };
+}
+
+
