@@ -23,6 +23,7 @@
         <button id="clearLines" class="control-btn">Clear Lines</button>
         <button id="cropGpxFiles" class="control-btn">Crop GPX Files</button>
         <button id="undoCrop" class="control-btn hidden">Undo Crop</button>
+        <button id="analyzeTracks" class="control-btn">Analyze Tracks</button>
     </div>
     
     <!-- Playback Controls -->
@@ -63,6 +64,27 @@
             <div class="progress-bar">
                 <div id="progressFill" class="progress-fill"></div>
                 <input id="progressSlider" type="range" min="0" max="100" value="0" class="progress-slider">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Track Analysis Controls -->
+    <div id="analysisControls" class="analysis-controls hidden">
+        <div class="analysis-header">
+            <h4>Track Analysis</h4>
+            <button id="closeAnalysis" class="close-btn">&times;</button>
+        </div>
+        <div class="analysis-content">
+            <div id="analysisInfo" class="analysis-info">
+                Time difference analysis (using first track as baseline)
+            </div>
+            <div id="analysisChart" class="analysis-chart">
+                <canvas id="differenceChart" width="400" height="200"></canvas>
+            </div>
+            <div class="analysis-stats">
+                <div id="analysisStats" class="stats-content">
+                    Select tracks to see analysis
+                </div>
             </div>
         </div>
     </div>

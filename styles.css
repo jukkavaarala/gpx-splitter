@@ -637,3 +637,114 @@ body {
     background: #e66100;
     border-color: #d39e00;
 }
+
+#analyzeTracks {
+    background: #6f42c1;
+    color: white;
+    border-color: #6f42c1;
+}
+
+#analyzeTracks:hover {
+    background: #5a2d8c;
+    border-color: #5a2d8c;
+}
+
+/* Track Analysis Controls */
+.analysis-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 450px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.analysis-controls.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+}
+
+.analysis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #6f42c1 0%, #8e44ad 100%);
+    color: white;
+}
+
+.analysis-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.analysis-content {
+    padding: 16px;
+}
+
+.analysis-info {
+    font-size: 11px;
+    color: #6c757d;
+    text-align: center;
+    margin-bottom: 12px;
+    font-style: italic;
+}
+
+.analysis-chart {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.analysis-chart canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+.analysis-stats {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 4px solid #6f42c1;
+}
+
+.stats-content {
+    font-size: 12px;
+    color: #495057;
+    line-height: 1.4;
+}
+
+.stats-content strong {
+    color: #212529;
+}
+
+/* Responsive adjustments for analysis controls */
+@media (max-width: 768px) {
+    .analysis-controls {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+    
+    .analysis-content {
+        padding: 12px;
+    }
+    
+    .analysis-chart {
+        min-height: 180px;
+        padding: 8px;
+    }
+}

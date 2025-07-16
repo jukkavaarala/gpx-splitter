@@ -1123,6 +1123,11 @@ function animateSimultaneousPlayback() {
     updatePlaybackProgress();
     updateMapViewForPlayback(); // Follow the playback markers
     
+    // Update analysis chart if visible
+    if (isAnalysisVisible && analysisChart && currentAnalysisResult) {
+        drawPlaybackMarkers();
+    }
+    
     if (!hasActiveMarkers) {
         // All tracks completed
         stopPlayback();
@@ -1359,6 +1364,11 @@ function seekToPosition(percent) {
     });
     
     updatePlaybackProgress();
+    
+    // Update analysis chart if visible
+    if (isAnalysisVisible && analysisChart && currentAnalysisResult) {
+        drawPlaybackMarkers();
+    }
 }
 
 // Function to update map view to follow playback markers
@@ -1695,5 +1705,562 @@ function cropGpxData(gpxData, fileName) {
         waypoints: [] // Don't include waypoints in cropped files
     };
 }
+
+// Track Analysis Functionality
+let analysisChart = null;
+let currentAnalysisResult = null;
+let isAnalysisVisible = false;
+
+function calculateTrackAnalysis() {
+    const visibleTracks = [];
+    
+    // Get all visible tracks
+    gpxFiles.forEach((file, fileId) => {
+        if (file.visible && file.data.tracks.length > 0) {
+            file.data.tracks.forEach((track, trackIndex) => {
+                if (track.points.length > 0) {
+                    const segment = findTrackSegment(track, startLine, finishLine);
+                    
+                    // Get the actual track points for analysis
+                    let trackPoints = [];
+                    for (let i = segment.startIndex; i <= segment.endIndex; i++) {
+                        if (track.points[i]) {
+                            trackPoints.push({
+                                ...track.points[i],
+                                originalIndex: i
+                            });
+                        }
+                    }
+                    
+                    if (trackPoints.length > 1) {
+                        visibleTracks.push({
+                            fileId: fileId,
+                            fileName: file.fileName,
+                            trackIndex: trackIndex,
+                            points: trackPoints,
+                            color: file.color,
+                            segment: segment
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    if (visibleTracks.length < 2) {
+        return {
+            success: false,
+            message: 'Need at least 2 visible tracks for analysis'
+        };
+    }
+    
+    // Use first track as baseline
+    const baselineTrack = visibleTracks[0];
+    const comparisonTracks = visibleTracks.slice(1);
+    
+    // Calculate cumulative distances for baseline track
+    const baselineDistances = calculateCumulativeDistances(baselineTrack.points);
+    
+    // Analyze each comparison track against baseline
+    const analysisResults = comparisonTracks.map(track => {
+        const trackDistances = calculateCumulativeDistances(track.points);
+        const timeDifferences = calculateTimeDifferences(baselineTrack, track, baselineDistances, trackDistances);
+        
+        return {
+            fileName: track.fileName,
+            color: track.color,
+            distances: trackDistances,
+            timeDifferences: timeDifferences,
+            stats: calculateTrackStats(timeDifferences),
+            fileId: track.fileId,
+            trackIndex: track.trackIndex,
+            points: track.points
+        };
+    });
+    
+    return {
+        success: true,
+        baseline: {
+            fileName: baselineTrack.fileName,
+            color: baselineTrack.color,
+            distances: baselineDistances,
+            fileId: baselineTrack.fileId,
+            trackIndex: baselineTrack.trackIndex,
+            points: baselineTrack.points
+        },
+        comparisons: analysisResults
+    };
+}
+
+function calculateCumulativeDistances(points) {
+    const distances = [0];
+    let totalDistance = 0;
+    
+    for (let i = 1; i < points.length; i++) {
+        const dist = calculateHaversineDistance(
+            points[i-1].lat, points[i-1].lng,
+            points[i].lat, points[i].lng
+        );
+        totalDistance += dist;
+        distances.push(totalDistance);
+    }
+    
+    return distances;
+}
+
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function calculateTimeDifferences(baselineTrack, comparisonTrack, baselineDistances, comparisonDistances) {
+    const differences = [];
+    const maxDistance = Math.min(
+        baselineDistances[baselineDistances.length - 1],
+        comparisonDistances[comparisonDistances.length - 1]
+    );
+    
+    // Sample at regular distance intervals
+    const sampleInterval = maxDistance / 100; // 100 sample points
+    
+    let initialTimeDifference = null;
+    
+    for (let dist = 0; dist <= maxDistance; dist += sampleInterval) {
+        const baselineTime = interpolateTimeAtDistance(baselineTrack.points, baselineDistances, dist);
+        const comparisonTime = interpolateTimeAtDistance(comparisonTrack.points, comparisonDistances, dist);
+        
+        if (baselineTime !== null && comparisonTime !== null) {
+            const timeDiff = (comparisonTime - baselineTime) / 1000; // Convert to seconds
+            
+            // Store the initial time difference to normalize all differences
+            if (initialTimeDifference === null) {
+                initialTimeDifference = timeDiff;
+            }
+            
+            // Normalize the time difference so it starts at 0
+            const normalizedTimeDiff = timeDiff - initialTimeDifference;
+            
+            differences.push({
+                distance: dist,
+                timeDifference: normalizedTimeDiff
+            });
+        }
+    }
+    
+    return differences;
+}
+
+function interpolateTimeAtDistance(points, distances, targetDistance) {
+    if (targetDistance <= 0) return points[0].time ? new Date(points[0].time).getTime() : null;
+    
+    for (let i = 1; i < distances.length; i++) {
+        if (distances[i] >= targetDistance) {
+            const t = (targetDistance - distances[i-1]) / (distances[i] - distances[i-1]);
+            
+            const time1 = points[i-1].time ? new Date(points[i-1].time).getTime() : null;
+            const time2 = points[i].time ? new Date(points[i].time).getTime() : null;
+            
+            if (time1 !== null && time2 !== null) {
+                return time1 + t * (time2 - time1);
+            }
+        }
+    }
+    
+    const lastPoint = points[points.length - 1];
+    return lastPoint.time ? new Date(lastPoint.time).getTime() : null;
+}
+
+function calculateTrackStats(timeDifferences) {
+    if (timeDifferences.length === 0) return null;
+    
+    const times = timeDifferences.map(d => d.timeDifference);
+    const avgDiff = times.reduce((a, b) => a + b, 0) / times.length;
+    const maxDiff = Math.max(...times);
+    const minDiff = Math.min(...times);
+    
+    return {
+        average: avgDiff,
+        maximum: maxDiff,
+        minimum: minDiff,
+        finalDifference: times[times.length - 1]
+    };
+}
+
+function showAnalysis() {
+    const analysisResult = calculateTrackAnalysis();
+    
+    if (!analysisResult.success) {
+        alert(analysisResult.message);
+        return;
+    }
+    
+    // Store current analysis result for interactive features
+    currentAnalysisResult = analysisResult;
+    isAnalysisVisible = true;
+    
+    // Show the analysis controls
+    document.getElementById('analysisControls').classList.remove('hidden');
+    
+    // Update analysis info
+    document.getElementById('analysisInfo').textContent = 
+        `Baseline: ${analysisResult.baseline.fileName} | Comparing ${analysisResult.comparisons.length} track(s) | Click graph to seek playback`;
+    
+    // Draw the chart
+    drawAnalysisChart(analysisResult);
+    
+    // Update stats
+    updateAnalysisStats(analysisResult);
+}
+
+function drawAnalysisChart(analysisResult) {
+    const canvas = document.getElementById('differenceChart');
+    const ctx = canvas.getContext('2d');
+    
+    // Store chart data for interactive features
+    analysisChart = {
+        canvas: canvas,
+        ctx: ctx,
+        analysisResult: analysisResult,
+        padding: 40,
+        chartWidth: canvas.width - 80,
+        chartHeight: canvas.height - 80
+    };
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Set up chart dimensions
+    const padding = 40;
+    const chartWidth = canvas.width - 2 * padding;
+    const chartHeight = canvas.height - 2 * padding;
+    
+    // Find data ranges
+    const allDistances = analysisResult.comparisons.flatMap(comp => 
+        comp.timeDifferences.map(d => d.distance)
+    );
+    const allTimeDiffs = analysisResult.comparisons.flatMap(comp => 
+        comp.timeDifferences.map(d => d.timeDifference)
+    );
+    
+    const maxDistance = Math.max(...allDistances) / 1000; // Convert to km
+    const maxTimeDiff = Math.max(...allTimeDiffs.map(Math.abs));
+    
+    // Store chart scaling for interactive features
+    analysisChart.maxDistance = maxDistance;
+    analysisChart.maxTimeDiff = maxTimeDiff;
+    analysisChart.zeroY = canvas.height - padding - (maxTimeDiff > 0 ? (chartHeight / 2) : 0);
+    
+    // Draw axes
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, canvas.height - padding);
+    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+    ctx.stroke();
+    
+    // Draw zero line
+    ctx.strokeStyle = '#999';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padding, analysisChart.zeroY);
+    ctx.lineTo(canvas.width - padding, analysisChart.zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Draw grid lines
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i < 5; i++) {
+        const x = padding + (i / 5) * chartWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, padding);
+        ctx.lineTo(x, canvas.height - padding);
+        ctx.stroke();
+    }
+    
+    // Draw labels
+    ctx.fillStyle = '#333';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Distance (km)', canvas.width / 2, canvas.height - 5);
+    
+    ctx.save();
+    ctx.translate(15, canvas.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Time Difference (seconds)', 0, 0);
+    ctx.restore();
+    
+    // Draw distance scale
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    for (let i = 0; i <= 5; i++) {
+        const x = padding + (i / 5) * chartWidth;
+        const distance = (i / 5) * maxDistance;
+        ctx.fillText(distance.toFixed(1), x, canvas.height - padding + 15);
+    }
+    
+    // Draw time scale
+    ctx.textAlign = 'right';
+    for (let i = -2; i <= 2; i++) {
+        if (i === 0) continue; // Skip zero line
+        const y = analysisChart.zeroY - (i / 2) * (chartHeight / 2);
+        const timeValue = (i / 2) * maxTimeDiff;
+        if (y > padding && y < canvas.height - padding) {
+            ctx.fillText(timeValue.toFixed(0) + 's', padding - 5, y + 3);
+        }
+    }
+    
+    // Draw data lines
+    analysisResult.comparisons.forEach((comparison, index) => {
+        if (comparison.timeDifferences.length === 0) return;
+        
+        ctx.strokeStyle = comparison.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        comparison.timeDifferences.forEach((point, pointIndex) => {
+            const x = padding + (point.distance / 1000 / maxDistance) * chartWidth;
+            const y = analysisChart.zeroY - (point.timeDifference / maxTimeDiff) * (chartHeight / 2);
+            
+            if (pointIndex === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        
+        ctx.stroke();
+    });
+    
+    // Draw legend
+    let legendY = padding + 10;
+    ctx.fillStyle = '#333';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Baseline: ' + analysisResult.baseline.fileName, canvas.width - padding - 120, legendY);
+    legendY += 12;
+    
+    analysisResult.comparisons.forEach((comparison, index) => {
+        ctx.fillStyle = comparison.color;
+        ctx.fillRect(canvas.width - padding - 120, legendY, 8, 8);
+        ctx.fillStyle = '#333';
+        ctx.fillText(comparison.fileName, canvas.width - padding - 108, legendY + 7);
+        legendY += 12;
+    });
+    
+    // Add click event listener for interactive seeking
+    if (!canvas.hasAnalysisClickListener) {
+        canvas.addEventListener('click', handleChartClick);
+        canvas.hasAnalysisClickListener = true;
+        canvas.style.cursor = 'pointer';
+    }
+    
+    // Draw current playback positions if playback is active
+    drawCurrentPlaybackMarkers(ctx, padding, chartWidth, chartHeight, maxDistance, analysisResult);
+}
+
+function drawCurrentPlaybackMarkers(ctx, padding, chartWidth, chartHeight, maxDistance, analysisResult) {
+    if (playbackState.tracks.length === 0) return;
+    
+    // Draw vertical lines for current playback positions
+    playbackState.tracks.forEach(track => {
+        if (track.currentPointIndex < track.startIndex || track.currentPointIndex > track.endIndex) return;
+        
+        // Find matching track in analysis result
+        let matchingTrack = null;
+        if (track.fileId === analysisResult.baseline.fileId && 
+            track.trackIndex === analysisResult.baseline.trackIndex) {
+            matchingTrack = analysisResult.baseline;
+        } else {
+            matchingTrack = analysisResult.comparisons.find(comp => 
+                comp.fileId === track.fileId && comp.trackIndex === track.trackIndex
+            );
+        }
+        
+        if (!matchingTrack) return;
+        
+        // Calculate current distance for this track
+        const segmentPoints = track.points.slice(track.startIndex, track.currentPointIndex + 1);
+        const currentDistance = calculateCumulativeDistances(segmentPoints);
+        const distanceKm = currentDistance[currentDistance.length - 1] / 1000;
+        
+        // Draw vertical marker line
+        const x = padding + (distanceKm / maxDistance) * chartWidth;
+        
+        ctx.strokeStyle = matchingTrack.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, padding);
+        ctx.lineTo(x, analysisChart.canvas.height - padding);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw marker dot at zero line
+        ctx.fillStyle = matchingTrack.color;
+        ctx.beginPath();
+        ctx.arc(x, analysisChart.zeroY, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw small text showing current time difference if comparison track
+        if (matchingTrack !== analysisResult.baseline) {
+            // Find closest time difference point
+            const closestDiff = matchingTrack.timeDifferences.find(d => 
+                Math.abs(d.distance - distanceKm * 1000) < 50
+            );
+            if (closestDiff) {
+                ctx.fillStyle = matchingTrack.color;
+                ctx.font = '9px Arial';
+                ctx.textAlign = 'center';
+                const timeText = (closestDiff.timeDifference >= 0 ? '+' : '') + closestDiff.timeDifference.toFixed(1) + 's';
+                ctx.fillText(timeText, x, padding - 5);
+            }
+        }
+    });
+}
+
+function updateAnalysisStats(analysisResult) {
+    const statsContainer = document.getElementById('analysisStats');
+    
+    let statsHtml = `<strong>Baseline:</strong> ${analysisResult.baseline.fileName}<br><br>`;
+    
+    analysisResult.comparisons.forEach((comparison, index) => {
+        const stats = comparison.stats;
+        if (stats) {
+            statsHtml += `<div style="color: ${comparison.color}; font-weight: bold;">${comparison.fileName}:</div>`;
+            statsHtml += `Average: ${stats.average >= 0 ? '+' : ''}${stats.average.toFixed(1)}s<br>`;
+            statsHtml += `Final: ${stats.finalDifference >= 0 ? '+' : ''}${stats.finalDifference.toFixed(1)}s<br>`;
+            statsHtml += `Range: ${stats.minimum.toFixed(1)}s to ${stats.maximum.toFixed(1)}s<br><br>`;
+        }
+    });
+    
+    statsContainer.innerHTML = statsHtml;
+}
+
+function closeAnalysis() {
+    document.getElementById('analysisControls').classList.add('hidden');
+    isAnalysisVisible = false;
+    currentAnalysisResult = null;
+    analysisChart = null;
+}
+
+function handleChartClick(event) {
+    if (!analysisChart || !currentAnalysisResult) return;
+    
+    const rect = analysisChart.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Check if click is within chart area
+    if (x < analysisChart.padding || x > analysisChart.canvas.width - analysisChart.padding ||
+        y < analysisChart.padding || y > analysisChart.canvas.height - analysisChart.padding) {
+        return;
+    }
+    
+    // Calculate distance from click position
+    const relativeX = (x - analysisChart.padding) / analysisChart.chartWidth;
+    const clickedDistance = relativeX * analysisChart.maxDistance * 1000; // Convert back to meters
+    
+    // Start playback and seek to this distance
+    seekPlaybackToDistance(clickedDistance);
+}
+
+function seekPlaybackToDistance(targetDistance) {
+    // Prepare tracks for playback if not already done
+    if (playbackState.tracks.length === 0) {
+        prepareTracksForPlayback();
+    }
+    
+    // Find corresponding point indices for each track
+    playbackState.tracks.forEach(track => {
+        if (track.points.length === 0) return;
+        
+        // Calculate cumulative distances for this track
+        const distances = calculateCumulativeDistances(track.points.slice(track.startIndex, track.endIndex + 1));
+        
+        // Find the point index closest to target distance
+        let closestIndex = 0;
+        let minDiff = Math.abs(distances[0] - targetDistance);
+        
+        for (let i = 1; i < distances.length; i++) {
+            const diff = Math.abs(distances[i] - targetDistance);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = i;
+            }
+        }
+        
+        // Update track position
+        track.currentPointIndex = track.startIndex + closestIndex;
+        track.isComplete = track.currentPointIndex >= track.endIndex;
+        
+        // Reset timing when seeking
+        track.startTime = null;
+        track.trackStartTime = null;
+        track.pausedTime = 0;
+        track.usingInterpolatedStart = false;
+        
+        // Update marker position
+        if (track.currentPointIndex < track.points.length) {
+            const point = track.points[track.currentPointIndex];
+            createTrackPlaybackMarker(track, point.lat, point.lng);
+        }
+    });
+    
+    // Show playback controls if hidden
+    if (document.getElementById('playbackControls').classList.contains('hidden')) {
+        document.getElementById('playbackControls').classList.remove('hidden');
+    }
+    
+    // Update progress display
+    updatePlaybackProgress();
+    
+    // Redraw chart with markers
+    if (isAnalysisVisible && analysisChart) {
+        drawPlaybackMarkers();
+    }
+}
+
+function drawPlaybackMarkers() {
+    if (!analysisChart || !currentAnalysisResult || playbackState.tracks.length === 0) return;
+    
+    // Redraw the entire chart to clear old markers
+    const canvas = analysisChart.canvas;
+    const ctx = analysisChart.ctx;
+    
+    // Save current chart state and redraw base chart
+    drawAnalysisChart(currentAnalysisResult);
+}
+
+// Update the existing updatePlaybackProgress function to redraw chart markers
+function updatePlaybackProgressWithChart() {
+    updatePlaybackProgress();
+    
+    // Redraw chart markers if analysis is visible
+    if (isAnalysisVisible && analysisChart && currentAnalysisResult) {
+        // Redraw the entire chart to clear old markers
+        drawAnalysisChart(currentAnalysisResult);
+    }
+}
+
+// Event listeners for analysis
+document.getElementById('analyzeTracks').addEventListener('click', function() {
+    showAnalysis();
+});
+
+document.getElementById('closeAnalysis').addEventListener('click', function() {
+    closeAnalysis();
+});
 
 
