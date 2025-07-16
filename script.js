@@ -1372,27 +1372,35 @@ function updateMapViewForPlayback() {
     
     if (activeMarkers.length === 0) return;
     
-    // Calculate bounds of all active markers
-    const bounds = L.latLngBounds(activeMarkers);
-    
-    // Get current map bounds
+    // Get current map bounds with a buffer zone
     const currentBounds = map.getBounds();
     
-    // Check if all markers are already visible in current view
-    const allMarkersVisible = activeMarkers.every(markerPos => 
-        currentBounds.contains(markerPos)
+    // Create a smaller buffer zone inside the current view to check if markers are getting close to edges
+    const buffer = 0.15; // 15% buffer from edges
+    const latDiff = currentBounds.getNorth() - currentBounds.getSouth();
+    const lngDiff = currentBounds.getEast() - currentBounds.getWest();
+    
+    const bufferedBounds = L.latLngBounds(
+        [currentBounds.getSouth() + latDiff * buffer, currentBounds.getWest() + lngDiff * buffer],
+        [currentBounds.getNorth() - latDiff * buffer, currentBounds.getEast() - lngDiff * buffer]
     );
     
-    if (allMarkersVisible) {
-        // All markers are visible, just pan to center without changing zoom
-        const center = bounds.getCenter();
-        map.panTo(center, { animate: true, duration: 0.5 });
-    } else {
-        // Some markers are outside view, fit bounds with padding
-        map.fitBounds(bounds, { 
-            padding: [50, 50], 
+    // Check if any markers are outside the buffered area (approaching edges)
+    const markersNearEdge = activeMarkers.some(markerPos => 
+        !bufferedBounds.contains(markerPos)
+    );
+    
+    // Only adjust map view if markers are approaching the edges or already outside
+    if (markersNearEdge) {
+        // Calculate bounds of all active markers
+        const markerBounds = L.latLngBounds(activeMarkers);
+        
+        // Fit bounds with generous padding to avoid frequent adjustments
+        map.fitBounds(markerBounds, { 
+            padding: [80, 80], 
             animate: true, 
-            duration: 0.5 
+            duration: 0.8,
+            maxZoom: map.getZoom() // Don't zoom in more than current level
         });
     }
 }
