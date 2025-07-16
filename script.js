@@ -562,7 +562,7 @@ function updateFileList() {
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="file-btn toggle ${file.visible ? '' : 'hidden'}" 
+                    <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
                             onclick="toggleGpxFile(${fileId})" 
                             title="${file.visible ? 'Hide' : 'Show'} file">
                         ${file.visible ? '👁️' : '👁️‍🗨️'}
