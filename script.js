@@ -55,6 +55,22 @@ let nextFileId = 1;
 // Backup storage for undo functionality
 let gpxFilesBackup = null;
 
+// Function to update crop/undo button visibility based on backup state
+function updateCropButtonVisibility() {
+    const cropBtn = document.getElementById('cropGpxFiles');
+    const undoBtn = document.getElementById('undoCrop');
+    
+    if (gpxFilesBackup) {
+        // Backup exists - show undo, hide crop
+        cropBtn.classList.add('hidden');
+        undoBtn.classList.remove('hidden');
+    } else {
+        // No backup - show crop, hide undo
+        cropBtn.classList.remove('hidden');
+        undoBtn.classList.add('hidden');
+    }
+}
+
 // Line styles
 const startLineStyle = {
     color: '#28a745',
@@ -1904,12 +1920,17 @@ function cropAllGpxFiles() {
     let croppedCount = 0;
     const filesToRemove = [];
     const filesToAdd = [];
+    const filesWithoutIntersections = []; // Track files that don't intersect
     
     gpxFiles.forEach((file, fileId) => {
         if (file.data.tracks.length > 0) {
             const croppedGpxData = cropGpxData(file.data, file.fileName);
+            
+            // Always mark the original file for removal since we're cropping
+            filesToRemove.push(fileId);
+            
             if (croppedGpxData && croppedGpxData.tracks.length > 0) {
-                filesToRemove.push(fileId);
+                // File has tracks that intersect with lines
                 
                 // Group tracks by original track and lap number to create separate files for each lap
                 const lapGroups = new Map(); // Map<originalTrackIndex, Map<lapNumber, tracks>>
@@ -1959,16 +1980,19 @@ function cropAllGpxFiles() {
                 });
                 
                 croppedCount++;
+            } else {
+                // File has no tracks that intersect with lines - track it for reporting
+                filesWithoutIntersections.push(file.fileName);
             }
         }
     });
     
-    if (croppedCount === 0) {
-        alert('No tracks found that intersect with the defined lines.');
+    if (filesToRemove.length === 0) {
+        alert('No GPX files to process.');
         return;
     }
     
-    // Remove original files and add cropped versions
+    // Remove original files (both those with and without intersections)
     filesToRemove.forEach(fileId => {
         removeGpxFileInternal(fileId);
     });
@@ -1981,10 +2005,25 @@ function cropAllGpxFiles() {
         }
     });
     
-    // Show undo button
-    document.getElementById('undoCrop').classList.remove('hidden');
+    // Show undo button and hide crop button
+    updateCropButtonVisibility();
     
-    alert(`Successfully cropped ${croppedCount} GPX file(s) into ${filesToAdd.length} lap segments. Use "Undo Crop" to restore original files.`);
+    // Create detailed success message
+    let message = '';
+    if (croppedCount > 0) {
+        message += `Successfully cropped ${croppedCount} GPX file(s) into ${filesToAdd.length} lap segments.`;
+    }
+    if (filesWithoutIntersections.length > 0) {
+        if (message) message += '\n\n';
+        message += `${filesWithoutIntersections.length} file(s) were hidden because they don't intersect with the defined lines:\n`;
+        message += filesWithoutIntersections.map(name => `• ${name}`).join('\n');
+    }
+    if (message) {
+        message += '\n\nUse "Undo Crop" to restore original files.';
+        alert(message);
+    } else {
+        alert('No tracks found that intersect with the defined lines. All files have been hidden.');
+    }
 }
 
 // Function to create backup of current state
@@ -2022,9 +2061,9 @@ function undoCrop() {
         }
     });
     
-    // Clear backup and hide undo button
+    // Clear backup and update button visibility
     gpxFilesBackup = null;
-    document.getElementById('undoCrop').classList.add('hidden');
+    updateCropButtonVisibility();
     
     alert('Successfully restored original GPX files.');
 }
@@ -2727,6 +2766,11 @@ document.getElementById('analyzeTracks').addEventListener('click', function() {
 
 document.getElementById('closeAnalysis').addEventListener('click', function() {
     closeAnalysis();
+});
+
+// Initialize button visibility on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateCropButtonVisibility();
 });
 
 
