@@ -275,6 +275,30 @@ body {
     color: white;
 }
 
+/* File group styles */
+.file-group {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.group-header {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.lap-item {
+    padding-left: 32px;
+    background-color: #fdfdfd;
+}
+
+.lap-list {
+    border-left: 3px solid #e9ecef;
+    margin-left: 16px;
+}
+
+.file-btn.group-toggle {
+    font-size: 10px;
+}
+
 .no-files {
     text-align: center;
     color: #6c757d;
@@ -655,6 +679,7 @@ body {
     bottom: 20px;
     right: 20px;
     width: 450px;
+    max-height: calc(100vh - 40px); /* Ensure it fits on screen */
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 10px;
@@ -662,6 +687,8 @@ body {
     z-index: 1000;
     transition: all 0.3s ease;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .analysis-controls.hidden {
@@ -687,6 +714,10 @@ body {
 
 .analysis-content {
     padding: 16px;
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .analysis-info {
@@ -718,6 +749,9 @@ body {
     border-radius: 8px;
     padding: 12px;
     border-left: 4px solid #6f42c1;
+    max-height: 200px;
+    overflow-y: auto;
+    flex-shrink: 0;
 }
 
 .stats-content {
@@ -730,6 +764,25 @@ body {
     color: #212529;
 }
 
+/* Custom scrollbar for stats */
+.analysis-stats::-webkit-scrollbar {
+    width: 6px;
+}
+
+.analysis-stats::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.analysis-stats::-webkit-scrollbar-thumb {
+    background: #6f42c1;
+    border-radius: 3px;
+}
+
+.analysis-stats::-webkit-scrollbar-thumb:hover {
+    background: #5a2d91;
+}
+
 /* Responsive adjustments for analysis controls */
 @media (max-width: 768px) {
     .analysis-controls {
@@ -737,6 +790,7 @@ body {
         right: 10px;
         left: 10px;
         width: auto;
+        max-height: calc(100vh - 20px);
     }
     
     .analysis-content {
@@ -744,7 +798,11 @@ body {
     }
     
     .analysis-chart {
-        min-height: 180px;
+        min-height: 150px;
         padding: 8px;
+    }
+    
+    .analysis-stats {
+        max-height: 150px;
     }
 }

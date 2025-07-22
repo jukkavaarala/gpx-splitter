@@ -162,19 +162,52 @@ function findAllLineIntersections(track, line) {
     
     // Threshold for intersection detection (in degrees, roughly 10 meters)
     const intersectionThreshold = 0.0001;
-    const intersections = [];
+    const allIntersections = [];
     
+    // Find all points within threshold
     for (let i = 0; i < track.points.length; i++) {
         const point = track.points[i];
         const distance = distanceToLineSegment(point, lineStart, lineEnd);
         
         if (distance < intersectionThreshold) {
-            intersections.push({
+            allIntersections.push({
                 pointIndex: i,
                 point: point,
                 distance: distance
             });
         }
+    }
+    
+    // Group consecutive intersections and return only one per crossing
+    const intersections = [];
+    let currentGroup = [];
+    
+    for (let i = 0; i < allIntersections.length; i++) {
+        const intersection = allIntersections[i];
+        
+        if (currentGroup.length === 0 || 
+            intersection.pointIndex === currentGroup[currentGroup.length - 1].pointIndex + 1) {
+            // This point is consecutive to the current group
+            currentGroup.push(intersection);
+        } else {
+            // Gap found, process the current group and start a new one
+            if (currentGroup.length > 0) {
+                // Find the point with minimum distance in this group
+                const bestIntersection = currentGroup.reduce((best, current) => 
+                    current.distance < best.distance ? current : best
+                );
+                intersections.push(bestIntersection);
+            }
+            currentGroup = [intersection];
+        }
+    }
+    
+    // Process the last group
+    if (currentGroup.length > 0) {
+        const bestIntersection = currentGroup.reduce((best, current) => 
+            current.distance < best.distance ? current : best
+        );
+        intersections.push(bestIntersection);
     }
     
     return intersections;
@@ -306,31 +339,50 @@ function findTrackLaps(track, startLine, finishLine) {
     const startIntersections = startLine ? findAllLineIntersections(track, startLine) : [];
     const finishIntersections = finishLine ? findAllLineIntersections(track, finishLine) : [];
     
+    // Debug logging
+    console.log(`Track analysis: Found ${startIntersections.length} start intersections and ${finishIntersections.length} finish intersections`);
+    if (startIntersections.length > 0) {
+        console.log('Start intersections at points:', startIntersections.map(s => s.pointIndex));
+    }
+    if (finishIntersections.length > 0) {
+        console.log('Finish intersections at points:', finishIntersections.map(f => f.pointIndex));
+    }
+    
     const laps = [];
     
     // If we have both start and finish lines, find complete laps
     if (startIntersections.length > 0 && finishIntersections.length > 0) {
-        // Create laps by pairing start and finish intersections
+        // Create laps by properly sequencing start->finish->start->finish...
+        let lapNumber = 1;
+        let lastFinishIndex = -1;
+        
         for (let i = 0; i < startIntersections.length; i++) {
             const startPoint = startIntersections[i];
             
-            // Find the next finish line after this start
-            const finishPoint = finishIntersections.find(f => f.pointIndex > startPoint.pointIndex);
-            
-            if (finishPoint) {
-                const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
-                const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+            // Only consider starts that come after the last used finish line
+            if (startPoint.pointIndex > lastFinishIndex) {
+                // Find the next finish line after this start
+                const finishPoint = finishIntersections.find(f => f.pointIndex > startPoint.pointIndex);
                 
-                laps.push({
-                    startIndex: startPoint.pointIndex,
-                    endIndex: finishPoint.pointIndex,
-                    hasStartLine: true,
-                    hasFinishLine: true,
-                    totalPoints: finishPoint.pointIndex - startPoint.pointIndex + 1,
-                    interpolatedStart: interpolatedStart,
-                    interpolatedEnd: interpolatedEnd,
-                    lapNumber: i + 1
-                });
+                if (finishPoint) {
+                    const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
+                    const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+                    
+                    laps.push({
+                        startIndex: startPoint.pointIndex,
+                        endIndex: finishPoint.pointIndex,
+                        hasStartLine: true,
+                        hasFinishLine: true,
+                        totalPoints: finishPoint.pointIndex - startPoint.pointIndex + 1,
+                        interpolatedStart: interpolatedStart,
+                        interpolatedEnd: interpolatedEnd,
+                        lapNumber: lapNumber
+                    });
+                    
+                    // Update the last used finish index to prevent overlapping laps
+                    lastFinishIndex = finishPoint.pointIndex;
+                    lapNumber++;
+                }
             }
         }
     } else if (startIntersections.length > 0) {
@@ -377,9 +429,13 @@ function findTrackLaps(track, startLine, finishLine) {
     
     // If no intersections found, return the original single segment behavior
     if (laps.length === 0) {
-        return [findTrackSegment(track, startLine, finishLine)];
+        const segment = findTrackSegment(track, startLine, finishLine);
+        segment.lapNumber = 1; // Add lap number for consistency
+        console.log('No intersections found, returning single segment:', segment);
+        return [segment];
     }
     
+    console.log(`Created ${laps.length} laps:`, laps.map(lap => `Lap ${lap.lapNumber}: points ${lap.startIndex}-${lap.endIndex}`));
     return laps;
 }
 
@@ -656,36 +712,136 @@ function updateFileList() {
         content.innerHTML = '<p class="no-files">No GPX files loaded</p>';
         return;
     }
+
+    // Group files by base name to show laps as sub-items
+    const fileGroups = new Map(); // Map<baseName, Array<{fileId, file, lapInfo}>>
+    
+    gpxFiles.forEach((file, fileId) => {
+        // Check if this is a lap file by looking for " (Lap " in the filename
+        const lapMatch = file.fileName.match(/^(.+) \(Lap (\d+)\)(.*)$/);
+        
+        if (lapMatch) {
+            // This is a lap file
+            const [, baseName, lapNumber, extension] = lapMatch;
+            const fullBaseName = baseName + extension;
+            
+            if (!fileGroups.has(fullBaseName)) {
+                fileGroups.set(fullBaseName, []);
+            }
+            fileGroups.get(fullBaseName).push({
+                fileId: fileId,
+                file: file,
+                lapNumber: parseInt(lapNumber),
+                isLap: true
+            });
+        } else {
+            // This is a regular file
+            if (!fileGroups.has(file.fileName)) {
+                fileGroups.set(file.fileName, []);
+            }
+            fileGroups.get(file.fileName).push({
+                fileId: fileId,
+                file: file,
+                lapNumber: 0,
+                isLap: false
+            });
+        }
+    });
     
     let html = '';
-    gpxFiles.forEach((file, fileId) => {
-        const trackCount = file.data.tracks.length;
-        const routeCount = file.data.routes.length;
-        const waypointCount = file.data.waypoints.length;
+    fileGroups.forEach((files, baseName) => {
+        // Sort files by lap number
+        files.sort((a, b) => a.lapNumber - b.lapNumber);
         
-        html += `
-            <div class="file-item">
-                <div class="file-color" style="background-color: ${file.color};"></div>
-                <div class="file-info">
-                    <div class="file-name" title="${file.fileName}">${file.fileName}</div>
-                    <div class="file-stats">
-                        ${trackCount} tracks, ${routeCount} routes, ${waypointCount} waypoints
+        if (files.length === 1 && !files[0].isLap) {
+            // Single file, not a lap - display normally
+            const { fileId, file } = files[0];
+            const trackCount = file.data.tracks.length;
+            const routeCount = file.data.routes.length;
+            const waypointCount = file.data.waypoints.length;
+            
+            html += `
+                <div class="file-item">
+                    <div class="file-color" style="background-color: ${file.color};"></div>
+                    <div class="file-info">
+                        <div class="file-name" title="${file.fileName}">${file.fileName}</div>
+                        <div class="file-stats">
+                            ${trackCount} tracks, ${routeCount} routes, ${waypointCount} waypoints
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
+                                onclick="toggleGpxFile(${fileId})" 
+                                title="${file.visible ? 'Hide' : 'Show'} file">
+                            ${file.visible ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                        <button class="file-btn remove" 
+                                onclick="removeGpxFile(${fileId})" 
+                                title="Remove file">
+                            ✕
+                        </button>
                     </div>
                 </div>
-                <div class="file-actions">
-                    <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
-                            onclick="toggleGpxFile(${fileId})" 
-                            title="${file.visible ? 'Hide' : 'Show'} file">
-                        ${file.visible ? '👁️' : '👁️‍🗨️'}
-                    </button>
-                    <button class="file-btn remove" 
-                            onclick="removeGpxFile(${fileId})" 
-                            title="Remove file">
-                        ✕
-                    </button>
+            `;
+        } else {
+            // Multiple files or lap files - group them
+            html += `
+                <div class="file-group">
+                    <div class="file-item group-header">
+                        <div class="file-color" style="background-color: ${files[0].file.color};"></div>
+                        <div class="file-info">
+                            <div class="file-name" title="${baseName}">${baseName}</div>
+                            <div class="file-stats">
+                                ${files.length} lap${files.length !== 1 ? 's' : ''}
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="file-btn group-toggle" 
+                                    onclick="toggleFileGroup('${baseName}')" 
+                                    title="Expand/Collapse laps">
+                                ▼
+                            </button>
+                        </div>
+                    </div>
+                    <div class="lap-list" id="laps-${baseName.replace(/[^a-zA-Z0-9]/g, '_')}">
+            `;
+            
+            files.forEach(({ fileId, file, lapNumber, isLap }) => {
+                const trackCount = file.data.tracks.length;
+                const routeCount = file.data.routes.length;
+                const waypointCount = file.data.waypoints.length;
+                const displayName = isLap ? `Lap ${lapNumber}` : file.fileName;
+                
+                html += `
+                    <div class="file-item lap-item">
+                        <div class="file-color" style="background-color: ${file.color};"></div>
+                        <div class="file-info">
+                            <div class="file-name" title="${file.fileName}">${displayName}</div>
+                            <div class="file-stats">
+                                ${trackCount} tracks, ${routeCount} routes, ${waypointCount} waypoints
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
+                                    onclick="toggleGpxFile(${fileId})" 
+                                    title="${file.visible ? 'Hide' : 'Show'} file">
+                                ${file.visible ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button class="file-btn remove" 
+                                    onclick="removeGpxFile(${fileId})" 
+                                    title="Remove file">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     });
     
     // Add global playback button
@@ -706,6 +862,20 @@ function updateFileList() {
     }
     
     content.innerHTML = html;
+}
+
+// Function to toggle file group expand/collapse
+function toggleFileGroup(baseName) {
+    const lapList = document.getElementById(`laps-${baseName.replace(/[^a-zA-Z0-9]/g, '_')}`);
+    const button = event.target;
+    
+    if (lapList.style.display === 'none') {
+        lapList.style.display = 'block';
+        button.textContent = '▼';
+    } else {
+        lapList.style.display = 'none';
+        button.textContent = '▶';
+    }
 }
 
 // Function to reset drawing state
@@ -1651,14 +1821,50 @@ function cropAllGpxFiles() {
     gpxFiles.forEach((file, fileId) => {
         if (file.data.tracks.length > 0) {
             const croppedGpxData = cropGpxData(file.data, file.fileName);
-            if (croppedGpxData) {
+            if (croppedGpxData && croppedGpxData.tracks.length > 0) {
                 filesToRemove.push(fileId);
-                filesToAdd.push({
-                    fileName: file.fileName,
-                    gpxData: croppedGpxData,
-                    originalColor: file.color,
-                    wasVisible: file.visible
+                
+                // Group tracks by original track and lap number to create separate files for each lap
+                const lapGroups = new Map(); // Map<originalTrackIndex, Map<lapNumber, tracks>>
+                
+                croppedGpxData.tracks.forEach(track => {
+                    if (!lapGroups.has(track.originalTrackIndex)) {
+                        lapGroups.set(track.originalTrackIndex, new Map());
+                    }
+                    const trackLaps = lapGroups.get(track.originalTrackIndex);
+                    if (!trackLaps.has(track.lapNumber)) {
+                        trackLaps.set(track.lapNumber, []);
+                    }
+                    trackLaps.get(track.lapNumber).push(track);
                 });
+                
+                // Create a separate file entry for each lap if multiple laps exist
+                lapGroups.forEach((lapMap, originalTrackIndex) => {
+                    lapMap.forEach((tracks, lapNumber) => {
+                        let fileName = file.fileName;
+                        if (lapGroups.size > 1 || lapMap.size > 1) {
+                            // Add lap suffix only if there are multiple tracks or multiple laps
+                            const baseFileName = file.fileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                            const extension = file.fileName.match(/\.[^/.]+$/) || [''];
+                            fileName = `${baseFileName} (Lap ${lapNumber})${extension[0]}`;
+                        }
+                        
+                        filesToAdd.push({
+                            fileName: fileName,
+                            gpxData: {
+                                tracks: tracks,
+                                routes: [],
+                                waypoints: []
+                            },
+                            originalColor: file.color,
+                            wasVisible: file.visible,
+                            originalFileId: fileId,
+                            lapNumber: lapNumber,
+                            originalTrackIndex: originalTrackIndex
+                        });
+                    });
+                });
+                
                 croppedCount++;
             }
         }
@@ -1685,7 +1891,7 @@ function cropAllGpxFiles() {
     // Show undo button
     document.getElementById('undoCrop').classList.remove('hidden');
     
-    alert(`Successfully cropped ${croppedCount} GPX file(s). Use "Undo Crop" to restore original files.`);
+    alert(`Successfully cropped ${croppedCount} GPX file(s) into ${filesToAdd.length} lap segments. Use "Undo Crop" to restore original files.`);
 }
 
 // Function to create backup of current state
@@ -1854,38 +2060,57 @@ function calculateTrackAnalysis() {
         if (file.visible && file.data.tracks.length > 0) {
             file.data.tracks.forEach((track, trackIndex) => {
                 if (track.points.length > 0) {
-                    // Use the new lap detection for more accurate analysis
-                    const laps = findTrackLaps(track, startLine, finishLine);
+                    // Check if this is already a cropped lap file
+                    const lapMatch = file.fileName.match(/^(.+) \(Lap (\d+)\)(.*)$/);
                     
-                    // For analysis, we'll use the first lap if multiple laps exist
-                    // or the original behavior if no laps are detected
-                    const segment = laps.length > 0 ? laps[0] : findTrackSegment(track, startLine, finishLine);
-                    
-                    // Get the actual track points for analysis
-                    let trackPoints = [];
-                    for (let i = segment.startIndex; i <= segment.endIndex; i++) {
-                        if (track.points[i]) {
-                            trackPoints.push({
-                                ...track.points[i],
-                                originalIndex: i
-                            });
-                        }
-                    }
-                    
-                    if (trackPoints.length > 1) {
-                        // Include lap information in the track name for analysis
-                        let trackName = file.fileName;
-                        if (laps.length > 1) {
-                            trackName += ` (Lap 1)`;
-                        }
-                        
+                    if (lapMatch) {
+                        // This is already a cropped lap file - use it as-is
+                        const [, baseName, lapNumber, extension] = lapMatch;
                         visibleTracks.push({
                             fileId: fileId,
-                            fileName: trackName,
+                            fileName: file.fileName,
                             trackIndex: trackIndex,
-                            points: trackPoints,
-                            color: file.color,
-                            segment: segment
+                            lapNumber: parseInt(lapNumber),
+                            points: track.points,
+                            color: file.color
+                        });
+                    } else {
+                        // This is an original file - check for multiple laps
+                        const laps = findTrackLaps(track, startLine, finishLine);
+                        
+                        // For analysis, include all laps as separate tracks
+                        laps.forEach((lap, lapIndex) => {
+                            // Get the actual track points for analysis
+                            let trackPoints = [];
+                            for (let i = lap.startIndex; i <= lap.endIndex; i++) {
+                                if (track.points[i]) {
+                                    trackPoints.push({
+                                        ...track.points[i],
+                                        originalIndex: i
+                                    });
+                                }
+                            }
+                            
+                            if (trackPoints.length > 1) {
+                                // Create proper track name that matches the cropped file naming
+                                let trackName = file.fileName;
+                                if (laps.length > 1) {
+                                    // Extract base filename and add lap info
+                                    const baseFileName = file.fileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                                    const extension = file.fileName.match(/\.[^/.]+$/) || [''];
+                                    trackName = `${baseFileName} (Lap ${lap.lapNumber})${extension[0]}`;
+                                }
+                                
+                                visibleTracks.push({
+                                    fileId: fileId,
+                                    fileName: trackName,
+                                    trackIndex: trackIndex,
+                                    lapNumber: lap.lapNumber || 1,
+                                    points: trackPoints,
+                                    color: file.color,
+                                    segment: lap
+                                });
+                            }
                         });
                     }
                 }
@@ -1920,6 +2145,7 @@ function calculateTrackAnalysis() {
             stats: calculateTrackStats(timeDifferences),
             fileId: track.fileId,
             trackIndex: track.trackIndex,
+            lapNumber: track.lapNumber,
             points: track.points
         };
     });
@@ -1932,6 +2158,7 @@ function calculateTrackAnalysis() {
             distances: baselineDistances,
             fileId: baselineTrack.fileId,
             trackIndex: baselineTrack.trackIndex,
+            lapNumber: baselineTrack.lapNumber,
             points: baselineTrack.points
         },
         comparisons: analysisResults
