@@ -55,6 +55,11 @@ let nextFileId = 1;
 // Backup storage for undo functionality
 let gpxFilesBackup = null;
 
+// Baseline selection for analysis
+let selectedBaselineFileId = null;
+let selectedBaselineTrackIndex = null;
+let selectedBaselineLapNumber = null;
+
 // Function to update crop/undo button visibility based on backup state
 function updateCropButtonVisibility() {
     const cropBtn = document.getElementById('cropGpxFiles');
@@ -68,6 +73,61 @@ function updateCropButtonVisibility() {
         // No backup - show crop, hide undo
         cropBtn.classList.remove('hidden');
         undoBtn.classList.add('hidden');
+    }
+}
+
+// Function to set baseline for analysis
+function setBaseline(fileId, trackIndex = 0, lapNumber = null) {
+    selectedBaselineFileId = fileId;
+    selectedBaselineTrackIndex = trackIndex;
+    selectedBaselineLapNumber = lapNumber;
+    
+    const file = gpxFiles.get(fileId);
+    const baselineName = lapNumber ? `${file.fileName} (Lap ${lapNumber})` : file.fileName;
+    console.log(`Set baseline to: ${baselineName}`);
+    
+    // Update file list to show current baseline selection
+    updateFileList();
+    
+    // If analysis is currently visible, refresh it with new baseline
+    if (isAnalysisVisible) {
+        console.log('Analysis is visible - refreshing analysis');
+        const result = calculateTrackAnalysis();
+        if (result.success) {
+            console.log('Analysis successful - updating display');
+            // Store current analysis result for interactive features
+            currentAnalysisResult = result;
+            
+            // Update analysis info
+            const analysisInfoElement = document.getElementById('analysisInfo');
+            if (analysisInfoElement) {
+                analysisInfoElement.textContent = 
+                    `Baseline: ${result.baseline.fileName} | Comparing ${result.comparisons.length} track(s) | Click graph to seek playback`;
+                console.log('Analysis info updated');
+            } else {
+                console.error('analysisInfo element not found!');
+            }
+            
+            // Draw the chart
+            try {
+                drawAnalysisChart(result);
+                console.log('Chart drawn');
+            } catch (error) {
+                console.error('Error drawing chart:', error);
+            }
+            
+            // Update stats
+            try {
+                updateAnalysisStats(result);
+                console.log('Stats updated');
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        } else {
+            console.log('Analysis failed:', result.message);
+        }
+    } else {
+        console.log('Analysis is not visible - skipping refresh');
     }
 }
 
@@ -801,7 +861,7 @@ function updateFileList() {
         files.sort((a, b) => a.lapNumber - b.lapNumber);
         
         if (files.length === 1 && !files[0].isLap) {
-            // Single file, not a lap - display normally
+            // Single file that is not a lap - display normally
             const { fileId, file } = files[0];
             const trackCount = file.data.tracks.length;
             const routeCount = file.data.routes.length;
@@ -817,6 +877,11 @@ function updateFileList() {
                         </div>
                     </div>
                     <div class="file-actions">
+                        <button class="file-btn baseline ${selectedBaselineFileId === fileId && selectedBaselineLapNumber === null ? 'active' : ''}" 
+                                onclick="setBaseline(${fileId}, 0, null)" 
+                                title="Set as baseline for analysis">
+                            📊
+                        </button>
                         <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
                                 onclick="toggleGpxFile(${fileId})" 
                                 title="${file.visible ? 'Hide' : 'Show'} file">
@@ -831,7 +896,7 @@ function updateFileList() {
                 </div>
             `;
         } else {
-            // Multiple files or lap files - group them
+            // Multiple files or any lap files (including single lap files) - group them
             html += `
                 <div class="file-group">
                     <div class="file-item group-header">
@@ -869,6 +934,11 @@ function updateFileList() {
                             </div>
                         </div>
                         <div class="file-actions">
+                            <button class="file-btn baseline ${selectedBaselineFileId === fileId && (isLap ? selectedBaselineLapNumber === lapNumber : selectedBaselineLapNumber === null) ? 'active' : ''}" 
+                                    onclick="setBaseline(${fileId}, 0, ${isLap ? lapNumber : 'null'})" 
+                                    title="Set as baseline for analysis">
+                                📊
+                            </button>
                             <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
                                     onclick="toggleGpxFile(${fileId})" 
                                     title="${file.visible ? 'Hide' : 'Show'} file">
@@ -2257,9 +2327,45 @@ function calculateTrackAnalysis() {
         };
     }
     
-    // Use first track as baseline
-    const baselineTrack = visibleTracks[0];
-    const comparisonTracks = visibleTracks.slice(1);
+    // Find the selected baseline track
+    let baselineTrack = null;
+    let baselineIndex = -1;
+    
+    console.log(`Looking for baseline: fileId=${selectedBaselineFileId}, lapNumber=${selectedBaselineLapNumber}`);
+    
+    if (selectedBaselineFileId !== null) {
+        // Look for the specifically selected baseline
+        for (let i = 0; i < visibleTracks.length; i++) {
+            const track = visibleTracks[i];
+            console.log(`Track ${i}: fileId=${track.fileId}, lapNumber=${track.lapNumber}, fileName=${track.fileName}`);
+            
+            if (track.fileId === selectedBaselineFileId) {
+                console.log('FileId matches! Checking lap number...');
+                console.log(`Selected lap: ${selectedBaselineLapNumber}, Track lap: ${track.lapNumber}`);
+                
+                // Check if lap number matches (or both are null for non-lap tracks)
+                if ((selectedBaselineLapNumber === null && track.lapNumber === undefined) ||
+                    (selectedBaselineLapNumber !== null && track.lapNumber === selectedBaselineLapNumber)) {
+                    baselineTrack = track;
+                    baselineIndex = i;
+                    console.log(`✓ Found baseline track: ${track.fileName}`);
+                    break;
+                } else {
+                    console.log(`✗ Lap number mismatch: selected=${selectedBaselineLapNumber} (${typeof selectedBaselineLapNumber}), track=${track.lapNumber} (${typeof track.lapNumber})`);
+                }
+            }
+        }
+    }
+    
+    // If no baseline is selected or baseline is not visible, use first track
+    if (!baselineTrack) {
+        console.log('No selected baseline found, using first track');
+        baselineTrack = visibleTracks[0];
+        baselineIndex = 0;
+    }
+    
+    // Get comparison tracks (all tracks except baseline)
+    const comparisonTracks = visibleTracks.filter((_, index) => index !== baselineIndex);
     
     // Calculate cumulative distances for baseline track
     const baselineDistances = calculateCumulativeDistances(baselineTrack.points);
