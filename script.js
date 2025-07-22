@@ -90,6 +90,34 @@ function generateColor(index) {
     return `hsl(${hue}, 70%, 50%)`;
 }
 
+// Generate lap-specific colors based on base color and lap number
+function generateLapColor(baseColor, lapNumber, totalLaps) {
+    // If only one lap, use the original color
+    if (totalLaps <= 1) {
+        return baseColor;
+    }
+    
+    // Extract HSL values from base color
+    const hslMatch = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (!hslMatch) {
+        // Fallback if base color is not HSL format
+        const baseHue = (lapNumber * 50) % 360;
+        return `hsl(${baseHue}, 70%, 50%)`;
+    }
+    
+    const [, baseHue, baseSat, baseLightness] = hslMatch.map(Number);
+    
+    // Create variations by adjusting hue and lightness
+    const hueShift = (lapNumber - 1) * (60 / totalLaps); // Spread across color spectrum
+    const newHue = (baseHue + hueShift) % 360;
+    
+    // Vary lightness to create additional distinction
+    const lightnessVariation = 10 + (lapNumber % 3) * 15; // 10%, 25%, 40% variation
+    const newLightness = Math.min(75, Math.max(35, baseLightness + lightnessVariation - 20));
+    
+    return `hsl(${newHue}, ${baseSat}%, ${newLightness}%)`;
+}
+
 // Geometric utility functions for line intersection calculations
 function distanceToLineSegment(point, line1, line2) {
     const A = point.lng - line1.lng;
@@ -1899,13 +1927,19 @@ function cropAllGpxFiles() {
                 
                 // Create a separate file entry for each lap if multiple laps exist
                 lapGroups.forEach((lapMap, originalTrackIndex) => {
+                    const totalLapsForTrack = lapMap.size;
                     lapMap.forEach((tracks, lapNumber) => {
                         let fileName = file.fileName;
+                        let lapColor = file.color; // Default to original color
+                        
                         if (lapGroups.size > 1 || lapMap.size > 1) {
                             // Add lap suffix only if there are multiple tracks or multiple laps
                             const baseFileName = file.fileName.replace(/\.[^/.]+$/, ''); // Remove extension
                             const extension = file.fileName.match(/\.[^/.]+$/) || [''];
                             fileName = `${baseFileName} (Lap ${lapNumber})${extension[0]}`;
+                            
+                            // Generate unique color for this lap
+                            lapColor = generateLapColor(file.color, lapNumber, totalLapsForTrack);
                         }
                         
                         filesToAdd.push({
@@ -1915,7 +1949,7 @@ function cropAllGpxFiles() {
                                 routes: [],
                                 waypoints: []
                             },
-                            originalColor: file.color,
+                            originalColor: lapColor, // Use lap-specific color
                             wasVisible: file.visible,
                             originalFileId: fileId,
                             lapNumber: lapNumber,
