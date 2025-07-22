@@ -151,6 +151,35 @@ function checkLineIntersection(track, line) {
     return null;
 }
 
+function findAllLineIntersections(track, line) {
+    if (!line || !track.points || track.points.length < 2) {
+        return [];
+    }
+
+    const lineLatLngs = line.line.getLatLngs();
+    const lineStart = lineLatLngs[0];
+    const lineEnd = lineLatLngs[1];
+    
+    // Threshold for intersection detection (in degrees, roughly 10 meters)
+    const intersectionThreshold = 0.0001;
+    const intersections = [];
+    
+    for (let i = 0; i < track.points.length; i++) {
+        const point = track.points[i];
+        const distance = distanceToLineSegment(point, lineStart, lineEnd);
+        
+        if (distance < intersectionThreshold) {
+            intersections.push({
+                pointIndex: i,
+                point: point,
+                distance: distance
+            });
+        }
+    }
+    
+    return intersections;
+}
+
 // Function to calculate precise intersection point between track and line
 function calculateLineIntersectionPoint(track, line, nearestPointIndex) {
     if (!line || !track.points || nearestPointIndex >= track.points.length) {
@@ -270,6 +299,88 @@ function findTrackSegment(track, startLine, finishLine) {
         interpolatedStart: interpolatedStart,
         interpolatedEnd: interpolatedEnd
     };
+}
+
+function findTrackLaps(track, startLine, finishLine) {
+    // Find all intersections with start and finish lines
+    const startIntersections = startLine ? findAllLineIntersections(track, startLine) : [];
+    const finishIntersections = finishLine ? findAllLineIntersections(track, finishLine) : [];
+    
+    const laps = [];
+    
+    // If we have both start and finish lines, find complete laps
+    if (startIntersections.length > 0 && finishIntersections.length > 0) {
+        // Create laps by pairing start and finish intersections
+        for (let i = 0; i < startIntersections.length; i++) {
+            const startPoint = startIntersections[i];
+            
+            // Find the next finish line after this start
+            const finishPoint = finishIntersections.find(f => f.pointIndex > startPoint.pointIndex);
+            
+            if (finishPoint) {
+                const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
+                const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+                
+                laps.push({
+                    startIndex: startPoint.pointIndex,
+                    endIndex: finishPoint.pointIndex,
+                    hasStartLine: true,
+                    hasFinishLine: true,
+                    totalPoints: finishPoint.pointIndex - startPoint.pointIndex + 1,
+                    interpolatedStart: interpolatedStart,
+                    interpolatedEnd: interpolatedEnd,
+                    lapNumber: i + 1
+                });
+            }
+        }
+    } else if (startIntersections.length > 0) {
+        // Only start line exists - create segments from each start to the next start (or end)
+        for (let i = 0; i < startIntersections.length; i++) {
+            const startPoint = startIntersections[i];
+            const nextStartPoint = startIntersections[i + 1];
+            const endIndex = nextStartPoint ? nextStartPoint.pointIndex : track.points.length - 1;
+            
+            const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
+            
+            laps.push({
+                startIndex: startPoint.pointIndex,
+                endIndex: endIndex,
+                hasStartLine: true,
+                hasFinishLine: false,
+                totalPoints: endIndex - startPoint.pointIndex + 1,
+                interpolatedStart: interpolatedStart,
+                interpolatedEnd: null,
+                lapNumber: i + 1
+            });
+        }
+    } else if (finishIntersections.length > 0) {
+        // Only finish line exists - create segments from start (or previous finish) to each finish
+        for (let i = 0; i < finishIntersections.length; i++) {
+            const finishPoint = finishIntersections[i];
+            const prevFinishPoint = finishIntersections[i - 1];
+            const startIndex = prevFinishPoint ? prevFinishPoint.pointIndex : 0;
+            
+            const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+            
+            laps.push({
+                startIndex: startIndex,
+                endIndex: finishPoint.pointIndex,
+                hasStartLine: false,
+                hasFinishLine: true,
+                totalPoints: finishPoint.pointIndex - startIndex + 1,
+                interpolatedStart: null,
+                interpolatedEnd: interpolatedEnd,
+                lapNumber: i + 1
+            });
+        }
+    }
+    
+    // If no intersections found, return the original single segment behavior
+    if (laps.length === 0) {
+        return [findTrackSegment(track, startLine, finishLine)];
+    }
+    
+    return laps;
 }
 
 // Function to create a line between two points
@@ -823,38 +934,50 @@ function prepareTracksForPlayback() {
         if (file.visible && file.data.tracks.length > 0) {
             file.data.tracks.forEach((track, trackIndex) => {
                 if (track.points.length > 0) {
-                    // Find track segment between start and finish lines
-                    const segment = findTrackSegment(track, startLine, finishLine);
+                    // Use the new lap detection for better playback
+                    const laps = findTrackLaps(track, startLine, finishLine);
                     
-                    const trackData = {
-                        fileId: fileId,
-                        fileName: file.fileName,
-                        trackIndex: trackIndex,
-                        trackName: track.name,
-                        color: file.color,
-                        points: track.points,
-                        startIndex: segment.startIndex,
-                        endIndex: segment.endIndex,
-                        currentPointIndex: segment.startIndex,
-                        marker: null,
-                        isComplete: false,
-                        hasStartLine: segment.hasStartLine,
-                        hasFinishLine: segment.hasFinishLine,
-                        segmentPoints: segment.totalPoints,
-                        startTime: null, // Real playback start time
-                        trackStartTime: null, // Track's first timestamp
-                        pausedTime: 0, // Total time spent paused
-                        interpolatedStart: segment.interpolatedStart,
-                        interpolatedEnd: segment.interpolatedEnd,
-                        usingInterpolatedStart: false, // Flag to track if we're using interpolated start
-                        // Smooth interpolation properties
-                        currentPosition: null, // Current interpolated position
-                        targetPosition: null, // Target position to move towards
-                        interpolationProgress: 0 // Progress between current and target (0-1)
-                    };
-                    
-                    tracks.push(trackData);
-                    maxPoints = Math.max(maxPoints, segment.totalPoints);
+                    // For playback, include all laps as separate tracks
+                    laps.forEach((lap, lapIndex) => {
+                        // Create track name with lap number if multiple laps exist
+                        let trackDisplayName = file.fileName;
+                        if (laps.length > 1) {
+                            trackDisplayName += ` (Lap ${lap.lapNumber})`;
+                        }
+                        
+                        const trackData = {
+                            fileId: fileId,
+                            fileName: file.fileName,
+                            trackIndex: trackIndex,
+                            trackName: track.name,
+                            displayName: trackDisplayName,
+                            color: file.color,
+                            points: track.points,
+                            startIndex: lap.startIndex,
+                            endIndex: lap.endIndex,
+                            currentPointIndex: lap.startIndex,
+                            marker: null,
+                            isComplete: false,
+                            hasStartLine: lap.hasStartLine,
+                            hasFinishLine: lap.hasFinishLine,
+                            segmentPoints: lap.totalPoints,
+                            startTime: null, // Real playback start time
+                            trackStartTime: null, // Track's first timestamp
+                            pausedTime: 0, // Total time spent paused
+                            interpolatedStart: lap.interpolatedStart,
+                            interpolatedEnd: lap.interpolatedEnd,
+                            usingInterpolatedStart: false, // Flag to track if we're using interpolated start
+                            lapNumber: lap.lapNumber,
+                            totalLaps: laps.length,
+                            // Smooth interpolation properties
+                            currentPosition: null, // Current interpolated position
+                            targetPosition: null, // Target position to move towards
+                            interpolationProgress: 0 // Progress between current and target (0-1)
+                        };
+                        
+                        tracks.push(trackData);
+                        maxPoints = Math.max(maxPoints, lap.totalPoints);
+                    });
                 }
             });
         }
@@ -1652,46 +1775,58 @@ function cropGpxData(gpxData, fileName) {
     
     gpxData.tracks.forEach((track, trackIndex) => {
         if (track.points.length > 0) {
-            const segment = findTrackSegment(track, startLine, finishLine);
+            const laps = findTrackLaps(track, startLine, finishLine);
             
-            // Only include tracks that have intersections with at least one line
-            if (segment.hasStartLine || segment.hasFinishLine) {
-                const croppedPoints = [];
-                
-                // Add interpolated start point if we have a start line intersection
-                if (segment.interpolatedStart) {
-                    croppedPoints.push({
-                        lat: segment.interpolatedStart.lat,
-                        lng: segment.interpolatedStart.lng,
-                        elevation: track.points[segment.startIndex]?.elevation || null,
-                        time: track.points[segment.startIndex]?.time || null
-                    });
+            // Process each lap as a separate track
+            laps.forEach((lap, lapIndex) => {
+                // Only include laps that have intersections with at least one line
+                if (lap.hasStartLine || lap.hasFinishLine) {
+                    const croppedPoints = [];
+                    
+                    // Add interpolated start point if we have a start line intersection
+                    if (lap.interpolatedStart) {
+                        croppedPoints.push({
+                            lat: lap.interpolatedStart.lat,
+                            lng: lap.interpolatedStart.lng,
+                            elevation: track.points[lap.startIndex]?.elevation || null,
+                            time: track.points[lap.startIndex]?.time || null
+                        });
+                    }
+                    
+                    // Add the track points between start and end
+                    for (let i = lap.startIndex; i <= lap.endIndex; i++) {
+                        croppedPoints.push(track.points[i]);
+                    }
+                    
+                    // Add interpolated end point if we have a finish line intersection
+                    if (lap.interpolatedEnd) {
+                        croppedPoints.push({
+                            lat: lap.interpolatedEnd.lat,
+                            lng: lap.interpolatedEnd.lng,
+                            elevation: track.points[lap.endIndex]?.elevation || null,
+                            time: track.points[lap.endIndex]?.time || null
+                        });
+                    }
+                    
+                    if (croppedPoints.length > 1) {
+                        // Create track name with lap number if multiple laps exist
+                        let trackName = track.name || `Track ${trackIndex + 1}`;
+                        if (laps.length > 1) {
+                            trackName += ` (Lap ${lap.lapNumber})`;
+                        }
+                        
+                        croppedTracks.push({
+                            name: trackName,
+                            segment: track.segment,
+                            points: croppedPoints,
+                            originalTrackIndex: trackIndex,
+                            lapNumber: lap.lapNumber,
+                            totalLaps: laps.length
+                        });
+                        hasValidTracks = true;
+                    }
                 }
-                
-                // Add the track points between start and end
-                for (let i = segment.startIndex; i <= segment.endIndex; i++) {
-                    croppedPoints.push(track.points[i]);
-                }
-                
-                // Add interpolated end point if we have a finish line intersection
-                if (segment.interpolatedEnd) {
-                    croppedPoints.push({
-                        lat: segment.interpolatedEnd.lat,
-                        lng: segment.interpolatedEnd.lng,
-                        elevation: track.points[segment.endIndex]?.elevation || null,
-                        time: track.points[segment.endIndex]?.time || null
-                    });
-                }
-                
-                if (croppedPoints.length > 1) {
-                    croppedTracks.push({
-                        name: track.name,
-                        segment: track.segment,
-                        points: croppedPoints
-                    });
-                    hasValidTracks = true;
-                }
-            }
+            });
         }
     });
     
@@ -1719,7 +1854,12 @@ function calculateTrackAnalysis() {
         if (file.visible && file.data.tracks.length > 0) {
             file.data.tracks.forEach((track, trackIndex) => {
                 if (track.points.length > 0) {
-                    const segment = findTrackSegment(track, startLine, finishLine);
+                    // Use the new lap detection for more accurate analysis
+                    const laps = findTrackLaps(track, startLine, finishLine);
+                    
+                    // For analysis, we'll use the first lap if multiple laps exist
+                    // or the original behavior if no laps are detected
+                    const segment = laps.length > 0 ? laps[0] : findTrackSegment(track, startLine, finishLine);
                     
                     // Get the actual track points for analysis
                     let trackPoints = [];
@@ -1733,9 +1873,15 @@ function calculateTrackAnalysis() {
                     }
                     
                     if (trackPoints.length > 1) {
+                        // Include lap information in the track name for analysis
+                        let trackName = file.fileName;
+                        if (laps.length > 1) {
+                            trackName += ` (Lap 1)`;
+                        }
+                        
                         visibleTracks.push({
                             fileId: fileId,
-                            fileName: file.fileName,
+                            fileName: trackName,
                             trackIndex: trackIndex,
                             points: trackPoints,
                             color: file.color,
