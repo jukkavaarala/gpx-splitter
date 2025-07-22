@@ -666,6 +666,9 @@ function toggleGpxFile(fileId) {
             file.layers.forEach(layer => map.removeLayer(layer));
         }
         
+        // Update playback marker visibility if playback is active
+        updatePlaybackMarkerVisibility();
+        
         updateFileList();
         console.log(`Toggled GPX file: ${file.fileName} (${file.visible ? 'visible' : 'hidden'})`);
     }
@@ -1163,6 +1166,14 @@ function createTrackPlaybackMarker(track, lat, lng) {
         playbackLayer.removeLayer(track.marker);
     }
     
+    // Check if the file is visible before creating marker
+    const file = gpxFiles.get(track.fileId);
+    if (!file || !file.visible) {
+        // File is hidden, don't create/show marker
+        track.marker = null;
+        return null;
+    }
+    
     // Create new marker with track's color
     track.marker = L.circleMarker([lat, lng], {
         radius: 8,
@@ -1258,18 +1269,23 @@ function updateTrackPosition(track) {
 function updatePlaybackProgress() {
     if (playbackState.tracks.length === 0) return;
     
-    // Calculate progress based on time elapsed vs total track duration
+    // Calculate progress based on time elapsed vs total track duration (only for visible tracks)
     let maxProgress = 0;
     let totalSegmentPoints = 0;
     let currentSegmentPoints = 0;
+    let visibleTracksCount = 0;
     
     playbackState.tracks.forEach(track => {
-        const segmentProgress = track.segmentPoints > 0 ? 
-            (track.currentPointIndex - track.startIndex) / (track.endIndex - track.startIndex) : 0;
-        maxProgress = Math.max(maxProgress, segmentProgress);
-        
-        totalSegmentPoints += track.segmentPoints;
-        currentSegmentPoints += Math.max(0, track.currentPointIndex - track.startIndex);
+        const file = gpxFiles.get(track.fileId);
+        if (file && file.visible) {
+            const segmentProgress = track.segmentPoints > 0 ? 
+                (track.currentPointIndex - track.startIndex) / (track.endIndex - track.startIndex) : 0;
+            maxProgress = Math.max(maxProgress, segmentProgress);
+            
+            totalSegmentPoints += track.segmentPoints;
+            currentSegmentPoints += Math.max(0, track.currentPointIndex - track.startIndex);
+            visibleTracksCount++;
+        }
     });
     
     const progressPercent = maxProgress * 100;
@@ -1277,17 +1293,19 @@ function updatePlaybackProgress() {
     document.getElementById('progressFill').style.width = progressPercent + '%';
     document.getElementById('progressSlider').value = progressPercent;
     
-    // Show timing information if available
-    const hasTimingData = playbackState.tracks.some(track => 
-        track.points[track.startIndex]?.time && track.points[track.endIndex]?.time
-    );
+    // Show timing information if available (only for visible tracks)
+    const hasTimingData = playbackState.tracks.some(track => {
+        const file = gpxFiles.get(track.fileId);
+        return file && file.visible && 
+               track.points[track.startIndex]?.time && track.points[track.endIndex]?.time;
+    });
     
     if (hasTimingData) {
         document.getElementById('progressText').textContent = 
-            `${Math.round(progressPercent)}% (realtime playback - ${currentSegmentPoints} / ${totalSegmentPoints} points)`;
+            `${Math.round(progressPercent)}% (realtime playback - ${currentSegmentPoints} / ${totalSegmentPoints} points from ${visibleTracksCount} visible tracks)`;
     } else {
         document.getElementById('progressText').textContent = 
-            `${Math.round(progressPercent)}% (${currentSegmentPoints} / ${totalSegmentPoints} segment points)`;
+            `${Math.round(progressPercent)}% (${currentSegmentPoints} / ${totalSegmentPoints} segment points from ${visibleTracksCount} visible tracks)`;
     }
 }
 
@@ -1304,6 +1322,9 @@ function animateSimultaneousPlayback() {
     let hasActiveMarkers = false;
     
     playbackState.tracks.forEach(track => {
+        const file = gpxFiles.get(track.fileId);
+        const isTrackVisible = file && file.visible;
+        
         if (!track.isComplete && track.currentPointIndex <= track.endIndex) {
             const currentPoint = track.points[track.currentPointIndex];
             const nextPoint = track.points[track.currentPointIndex + 1];
@@ -1328,7 +1349,7 @@ function animateSimultaneousPlayback() {
                 
                 track.trackStartTime = track.points[track.currentPointIndex].time ? 
                     new Date(track.points[track.currentPointIndex].time).getTime() : null;
-                hasActiveMarkers = true;
+                if (isTrackVisible) hasActiveMarkers = true;
             } else if (track.trackStartTime && currentPoint.time) {
                 // Calculate elapsed time in track vs real playback time
                 let targetTime;
@@ -1360,7 +1381,7 @@ function animateSimultaneousPlayback() {
                 // No timestamp data, fall back to regular interval
                 const interval = 1000 / playbackState.speed; // 1 second intervals
                 shouldAdvance = deltaTime >= interval;
-                hasActiveMarkers = true;
+                if (isTrackVisible) hasActiveMarkers = true;
             }
             
             if (shouldAdvance && track.startTime !== null) {
@@ -1386,7 +1407,7 @@ function animateSimultaneousPlayback() {
                     }
                 }
                 
-                hasActiveMarkers = true;
+                if (isTrackVisible) hasActiveMarkers = true;
                 
                 // Mark track as complete if we've reached the end of the segment
                 if (track.currentPointIndex > track.endIndex) {
@@ -1398,9 +1419,9 @@ function animateSimultaneousPlayback() {
                 const frameTime = deltaTime / 1000; // Convert to seconds
                 const interpolationSpeed = playbackState.speed; // Adjust for smooth movement
                 track.interpolationProgress = Math.min(1, track.interpolationProgress + frameTime * interpolationSpeed);
-                hasActiveMarkers = true;
+                if (isTrackVisible) hasActiveMarkers = true;
             } else {
-                hasActiveMarkers = true; // Still has points to process
+                if (isTrackVisible) hasActiveMarkers = true; // Still has points to process
             }
             
             // Update marker position
@@ -1422,7 +1443,17 @@ function animateSimultaneousPlayback() {
     }
     
     if (!hasActiveMarkers) {
-        // All tracks completed
+        // All visible tracks completed or no visible tracks
+        const hasVisibleTracks = playbackState.tracks.some(track => {
+            const file = gpxFiles.get(track.fileId);
+            return file && file.visible;
+        });
+        
+        if (!hasVisibleTracks) {
+            console.log('No visible tracks - stopping playback');
+        } else {
+            console.log('All visible tracks completed - stopping playback');
+        }
         stopPlayback();
         return;
     }
@@ -1668,9 +1699,12 @@ function seekToPosition(percent) {
 function updateMapViewForPlayback() {
     if (playbackState.tracks.length === 0) return;
     
-    // Get all active marker positions
+    // Get all active marker positions from visible files only
     const activeMarkers = playbackState.tracks
-        .filter(track => track.marker && !track.isComplete)
+        .filter(track => {
+            const file = gpxFiles.get(track.fileId);
+            return track.marker && !track.isComplete && file && file.visible;
+        })
         .map(track => track.marker.getLatLng());
     
     if (activeMarkers.length === 0) return;
@@ -1706,6 +1740,31 @@ function updateMapViewForPlayback() {
             maxZoom: map.getZoom() // Don't zoom in more than current level
         });
     }
+}
+
+// Function to update playback marker visibility based on file visibility
+function updatePlaybackMarkerVisibility() {
+    if (!playbackState.isPlaying || playbackState.tracks.length === 0) {
+        return;
+    }
+    
+    playbackState.tracks.forEach(track => {
+        const file = gpxFiles.get(track.fileId);
+        
+        if (track.marker) {
+            if (file && file.visible) {
+                // File is visible - ensure marker is on the map
+                if (!map.hasLayer(track.marker)) {
+                    playbackLayer.addLayer(track.marker);
+                }
+            } else {
+                // File is hidden - remove marker from the map
+                if (map.hasLayer(track.marker)) {
+                    playbackLayer.removeLayer(track.marker);
+                }
+            }
+        }
+    });
 }
 
 // Event listeners for playback controls
