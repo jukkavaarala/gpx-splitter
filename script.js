@@ -1207,7 +1207,8 @@ let playbackState = {
     lastUpdateTime: 0,
     maxPoints: 0, // Maximum points across all tracks
     pauseStartTime: 0, // When pause was initiated
-    smoothInterpolation: true // Default to smooth playback
+    smoothInterpolation: true, // Default to smooth playback
+    followLocation: true // Whether to follow the playback markers on the map
 };
 
 const playbackLayer = L.layerGroup().addTo(map);
@@ -1811,7 +1812,8 @@ function seekToPosition(percent) {
 
 // Function to update map view to follow playback markers
 function updateMapViewForPlayback() {
-    if (playbackState.tracks.length === 0) return;
+    // Only follow if the setting is enabled
+    if (!playbackState.followLocation || playbackState.tracks.length === 0) return;
     
     // Get all active marker positions from visible files only
     const activeMarkers = playbackState.tracks
@@ -1936,6 +1938,12 @@ document.getElementById('smoothInterpolation').addEventListener('change', functi
             track.interpolationProgress = 0;
         });
     }
+});
+
+// Add event listener for follow location checkbox
+document.getElementById('followLocation').addEventListener('change', function() {
+    playbackState.followLocation = this.checked;
+    console.log(`Map following ${playbackState.followLocation ? 'enabled' : 'disabled'}`);
 });
 
 document.getElementById('progressSlider').addEventListener('input', function() {

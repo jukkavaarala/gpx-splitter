@@ -525,8 +525,8 @@ body {
 
 .playback-info {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
     margin-bottom: 12px;
     font-size: 12px;
 }
@@ -548,6 +548,26 @@ body {
     border-radius: 4px;
     font-size: 12px;
     background: white;
+}
+
+.follow-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.follow-control label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.follow-control input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #007bff;
+    cursor: pointer;
 }
 
 .progress-info {
@@ -641,9 +661,7 @@ body {
     }
     
     .playback-info {
-        flex-direction: column;
-        gap: 8px;
-        align-items: flex-start;
+        gap: 6px;
     }
     
     .track-count-info {
