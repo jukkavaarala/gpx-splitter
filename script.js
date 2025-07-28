@@ -231,6 +231,197 @@ function generateLapColor(baseColor, lapNumber, totalLaps) {
     return `hsl(${newHue}, ${baseSat}%, ${newLightness}%)`;
 }
 
+// Helper functions for track information
+function calculateTrackDistance(points) {
+    if (!points || points.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        
+        // Haversine formula for distance calculation
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = (curr.lat - prev.lat) * Math.PI / 180;
+        const dLng = (curr.lng - prev.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(prev.lat * Math.PI / 180) * Math.cos(curr.lat * Math.PI / 180) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        totalDistance += R * c;
+    }
+    
+    return totalDistance;
+}
+
+function calculateTrackDuration(points) {
+    if (!points || points.length < 2) return null;
+    
+    const startTime = points[0].time;
+    const endTime = points[points.length - 1].time;
+    
+    if (!startTime || !endTime) return null;
+    
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    return end.getTime() - start.getTime(); // Duration in milliseconds
+}
+
+function formatDistance(distanceKm) {
+    if (distanceKm < 1) {
+        return `${Math.round(distanceKm * 1000)}m`;
+    } else {
+        return `${distanceKm.toFixed(2)}km`;
+    }
+}
+
+function formatDuration(durationMs) {
+    if (!durationMs) return 'N/A';
+    
+    const totalSeconds = Math.floor(durationMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function showFileInfo(fileId, lapNumber = null) {
+    const file = gpxFiles.get(fileId);
+    if (!file) return;
+    
+    let trackData;
+    let displayName;
+    
+    if (lapNumber !== null) {
+        // Check if this file already has a lap number in its filename
+        const lapMatch = file.fileName.match(/^(.+) \(Lap (\d+)\)(.*)$/);
+        if (lapMatch) {
+            // This is a standalone lap file - use all its data
+            const allPoints = [];
+            file.data.tracks.forEach(track => {
+                allPoints.push(...track.points);
+            });
+            trackData = { points: allPoints };
+            displayName = file.fileName;
+        } else {
+            // Find the specific lap within a track that has been split by start/finish lines
+            const track = file.data.tracks[0]; // Assuming single track per file
+            if (track) {
+                const laps = findTrackLaps(track, startLine, finishLine);
+                const lap = laps.find(l => l.lapNumber === lapNumber);
+                if (lap) {
+                    const lapPoints = track.points.slice(lap.startIndex, lap.endIndex + 1);
+                    trackData = { points: lapPoints };
+                    displayName = `${file.fileName} - Lap ${lapNumber}`;
+                }
+            }
+        }
+    } else {
+        // Use all tracks from the file
+        const allPoints = [];
+        file.data.tracks.forEach(track => {
+            allPoints.push(...track.points);
+        });
+        trackData = { points: allPoints };
+        displayName = file.fileName;
+    }
+    
+    if (!trackData || !trackData.points.length) {
+        alert('No track data available');
+        return;
+    }
+    
+    const distance = calculateTrackDistance(trackData.points);
+    const duration = calculateTrackDuration(trackData.points);
+    const pointCount = trackData.points.length;
+    
+    const startTime = trackData.points[0].time ? new Date(trackData.points[0].time).toLocaleString() : 'N/A';
+    const endTime = trackData.points[trackData.points.length - 1].time ? 
+        new Date(trackData.points[trackData.points.length - 1].time).toLocaleString() : 'N/A';
+    
+    const elevationData = trackData.points.filter(p => p.elevation !== null).map(p => p.elevation);
+    let elevationInfo = '';
+    if (elevationData.length > 0) {
+        const minElevation = Math.min(...elevationData);
+        const maxElevation = Math.max(...elevationData);
+        const elevationGain = maxElevation - minElevation;
+        elevationInfo = `
+            <p><strong>Elevation:</strong> ${minElevation.toFixed(0)}m - ${maxElevation.toFixed(0)}m (${elevationGain.toFixed(0)}m gain)</p>
+        `;
+    }
+    
+    const infoContent = `
+        <div style="max-width: 400px;">
+            <h3>${displayName}</h3>
+            <p><strong>Distance:</strong> ${formatDistance(distance)}</p>
+            <p><strong>Duration:</strong> ${formatDuration(duration)}</p>
+            <p><strong>Points:</strong> ${pointCount}</p>
+            <p><strong>Start Time:</strong> ${startTime}</p>
+            <p><strong>End Time:</strong> ${endTime}</p>
+            ${elevationInfo}
+            <p><strong>Tracks:</strong> ${file.data.tracks.length}</p>
+            <p><strong>Routes:</strong> ${file.data.routes.length}</p>
+            <p><strong>Waypoints:</strong> ${file.data.waypoints.length}</p>
+        </div>
+    `;
+    
+    // Create a simple modal dialog
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+    `;
+    
+    modalContent.innerHTML = infoContent + `
+        <div style="text-align: right; margin-top: 20px;">
+            <button id="closeInfoModal" 
+                    style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Close
+            </button>
+        </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Add click event listener to close button
+    document.getElementById('closeInfoModal').addEventListener('click', function() {
+        modal.remove();
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
 // Geometric utility functions for line intersection calculations
 function distanceToLineSegment(point, line1, line2) {
     const A = point.lng - line1.lng;
@@ -900,35 +1091,34 @@ function updateFileList() {
         if (files.length === 1 && !files[0].isLap) {
             // Single file that is not a lap - display normally
             const { fileId, file } = files[0];
-            const trackCount = file.data.tracks.length;
-            const routeCount = file.data.routes.length;
-            const waypointCount = file.data.waypoints.length;
             
             html += `
                 <div class="file-item">
                     <div class="file-color" style="background-color: ${file.color};"></div>
                     <div class="file-info">
                         <div class="file-name" title="${file.fileName}">${file.fileName}</div>
-                        <div class="file-stats">
-                            ${trackCount} tracks, ${routeCount} routes, ${waypointCount} waypoints
+                        <div class="file-actions">
+                            <button class="file-btn info" 
+                                    onclick="showFileInfo(${fileId})" 
+                                    title="Show file information">
+                                ℹ️
+                            </button>
+                            <button class="file-btn baseline ${selectedBaselineFileId === fileId && selectedBaselineLapNumber === null ? 'active' : ''}" 
+                                    onclick="setBaseline(${fileId}, 0, null)" 
+                                    title="Set as baseline for analysis">
+                                📊
+                            </button>
+                            <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
+                                    onclick="toggleGpxFile(${fileId})" 
+                                    title="${file.visible ? 'Hide' : 'Show'} file">
+                                ${file.visible ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button class="file-btn remove" 
+                                    onclick="removeGpxFile(${fileId})" 
+                                    title="Remove file">
+                                ✕
+                            </button>
                         </div>
-                    </div>
-                    <div class="file-actions">
-                        <button class="file-btn baseline ${selectedBaselineFileId === fileId && selectedBaselineLapNumber === null ? 'active' : ''}" 
-                                onclick="setBaseline(${fileId}, 0, null)" 
-                                title="Set as baseline for analysis">
-                            📊
-                        </button>
-                        <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
-                                onclick="toggleGpxFile(${fileId})" 
-                                title="${file.visible ? 'Hide' : 'Show'} file">
-                            ${file.visible ? '👁️' : '👁️‍🗨️'}
-                        </button>
-                        <button class="file-btn remove" 
-                                onclick="removeGpxFile(${fileId})" 
-                                title="Remove file">
-                            ✕
-                        </button>
                     </div>
                 </div>
             `;
@@ -956,9 +1146,6 @@ function updateFileList() {
             `;
             
             files.forEach(({ fileId, file, lapNumber, isLap }) => {
-                const trackCount = file.data.tracks.length;
-                const routeCount = file.data.routes.length;
-                const waypointCount = file.data.waypoints.length;
                 const displayName = isLap ? `Lap ${lapNumber}` : file.fileName;
                 
                 html += `
@@ -966,26 +1153,28 @@ function updateFileList() {
                         <div class="file-color" style="background-color: ${file.color};"></div>
                         <div class="file-info">
                             <div class="file-name" title="${file.fileName}">${displayName}</div>
-                            <div class="file-stats">
-                                ${trackCount} tracks, ${routeCount} routes, ${waypointCount} waypoints
+                            <div class="file-actions">
+                                <button class="file-btn info" 
+                                        onclick="showFileInfo(${fileId}, ${isLap ? lapNumber : 'null'})" 
+                                        title="Show ${isLap ? 'lap' : 'file'} information">
+                                    ℹ️
+                                </button>
+                                <button class="file-btn baseline ${selectedBaselineFileId === fileId && (isLap ? selectedBaselineLapNumber === lapNumber : selectedBaselineLapNumber === null) ? 'active' : ''}" 
+                                        onclick="setBaseline(${fileId}, 0, ${isLap ? lapNumber : 'null'})" 
+                                        title="Set as baseline for analysis">
+                                    📊
+                                </button>
+                                <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
+                                        onclick="toggleGpxFile(${fileId})" 
+                                        title="${file.visible ? 'Hide' : 'Show'} file">
+                                    ${file.visible ? '👁️' : '👁️‍🗨️'}
+                                </button>
+                                <button class="file-btn remove" 
+                                        onclick="removeGpxFile(${fileId})" 
+                                        title="Remove file">
+                                    ✕
+                                </button>
                             </div>
-                        </div>
-                        <div class="file-actions">
-                            <button class="file-btn baseline ${selectedBaselineFileId === fileId && (isLap ? selectedBaselineLapNumber === lapNumber : selectedBaselineLapNumber === null) ? 'active' : ''}" 
-                                    onclick="setBaseline(${fileId}, 0, ${isLap ? lapNumber : 'null'})" 
-                                    title="Set as baseline for analysis">
-                                📊
-                            </button>
-                            <button class="file-btn toggle ${file.visible ? '' : 'inactive'}" 
-                                    onclick="toggleGpxFile(${fileId})" 
-                                    title="${file.visible ? 'Hide' : 'Show'} file">
-                                ${file.visible ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                            <button class="file-btn remove" 
-                                    onclick="removeGpxFile(${fileId})" 
-                                    title="Remove file">
-                                ✕
-                            </button>
                         </div>
                     </div>
                 `;
@@ -2789,15 +2978,50 @@ function drawCurrentPlaybackMarkers(ctx, padding, chartWidth, chartHeight, maxDi
 function updateAnalysisStats(analysisResult) {
     const statsContainer = document.getElementById('analysisStats');
     
-    let statsHtml = `<strong>Baseline:</strong> ${analysisResult.baseline.fileName}<br><br>`;
+    // Calculate baseline distance and duration
+    const baselineDistance = calculateTrackDistance(analysisResult.baseline.points);
+    const baselineDuration = calculateTrackDuration(analysisResult.baseline.points);
+    
+    let statsHtml = `
+        <div style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <strong>Baseline:</strong> ${analysisResult.baseline.fileName}<br>
+            <strong>Distance:</strong> ${formatDistance(baselineDistance)}<br>
+            <strong>Duration:</strong> ${formatDuration(baselineDuration)}
+        </div>
+    `;
     
     analysisResult.comparisons.forEach((comparison, index) => {
         const stats = comparison.stats;
         if (stats) {
-            statsHtml += `<div style="color: ${comparison.color}; font-weight: bold;">${comparison.fileName}:</div>`;
-            statsHtml += `Average: ${stats.average >= 0 ? '+' : ''}${stats.average.toFixed(1)}s<br>`;
-            statsHtml += `Final: ${stats.finalDifference >= 0 ? '+' : ''}${stats.finalDifference.toFixed(1)}s<br>`;
-            statsHtml += `Range: ${stats.minimum.toFixed(1)}s to ${stats.maximum.toFixed(1)}s<br><br>`;
+            // Calculate distance and duration for this comparison track
+            const comparisonDistance = calculateTrackDistance(comparison.points);
+            const comparisonDuration = calculateTrackDuration(comparison.points);
+            const distanceDiff = comparisonDistance - baselineDistance;
+            const durationDiff = comparisonDuration ? (baselineDuration ? comparisonDuration - baselineDuration : null) : null;
+            
+            statsHtml += `
+                <div style="margin-bottom: 15px; padding: 10px; border-left: 4px solid ${comparison.color}; background-color: #f8f9fa;">
+                    <div style="color: ${comparison.color}; font-weight: bold; margin-bottom: 5px;">${comparison.fileName}:</div>
+                    <strong>Distance:</strong> ${formatDistance(comparisonDistance)}`;
+            
+            if (Math.abs(distanceDiff) > 0.001) { // Only show difference if significant (> 1m)
+                statsHtml += ` (${distanceDiff >= 0 ? '+' : ''}${formatDistance(Math.abs(distanceDiff))})`;
+            }
+            
+            statsHtml += `<br><strong>Duration:</strong> ${formatDuration(comparisonDuration)}`;
+            
+            if (durationDiff !== null) {
+                const durationDiffSeconds = durationDiff / 1000;
+                statsHtml += ` (${durationDiffSeconds >= 0 ? '+' : ''}${durationDiffSeconds.toFixed(1)}s)`;
+            }
+            
+            statsHtml += `<br>
+                    <strong>Time Analysis:</strong><br>
+                    &nbsp;&nbsp;Average: ${stats.average >= 0 ? '+' : ''}${stats.average.toFixed(1)}s<br>
+                    &nbsp;&nbsp;Final: ${stats.finalDifference >= 0 ? '+' : ''}${stats.finalDifference.toFixed(1)}s<br>
+                    &nbsp;&nbsp;Range: ${stats.minimum.toFixed(1)}s to ${stats.maximum.toFixed(1)}s
+                </div>
+            `;
         }
     });
     
