@@ -3146,6 +3146,261 @@ document.getElementById('closeAnalysis').addEventListener('click', function() {
 // Initialize button visibility on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateCropButtonVisibility();
+    initializePanelDragAndResize();
+});
+
+// Panel Drag and Resize Functionality
+let currentZIndex = 1000; // Starting z-index for panels
+
+function initializePanelDragAndResize() {
+    const panels = document.querySelectorAll('.resizable-panel');
+    
+    panels.forEach(panel => {
+        const header = panel.querySelector('.panel-header');
+        const resizeHandle = panel.querySelector('.resize-handle');
+        
+        // Add click handler to bring panel to front
+        panel.addEventListener('mousedown', () => bringToFront(panel));
+        
+        // Make panel draggable
+        if (header) {
+            makeDraggable(panel, header);
+        }
+        
+        // Make panel resizable
+        if (resizeHandle) {
+            makeResizable(panel, resizeHandle);
+        }
+    });
+}
+
+function bringToFront(panel) {
+    currentZIndex++;
+    panel.style.zIndex = currentZIndex;
+}
+
+function makeDraggable(panel, dragHandle) {
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+    
+    function dragStart(e) {
+        // Don't drag if clicking on close button or other interactive elements
+        if (e.target.classList.contains('close-btn') || 
+            e.target.tagName === 'BUTTON' || 
+            e.target.tagName === 'INPUT' ||
+            e.target.tagName === 'SELECT') {
+            return;
+        }
+        
+        // Bring panel to front when starting to drag
+        bringToFront(panel);
+        
+        if (e.type === "touchstart") {
+            initialX = e.touches[0].clientX - xOffset;
+            initialY = e.touches[0].clientY - yOffset;
+        } else {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+        }
+        
+        if (e.target === dragHandle || dragHandle.contains(e.target)) {
+            isDragging = true;
+            panel.classList.add('dragging');
+            
+            // Get current position
+            const rect = panel.getBoundingClientRect();
+            xOffset = rect.left;
+            yOffset = rect.top;
+            
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+        }
+    }
+    
+    function dragEnd(e) {
+        if (isDragging) {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+            panel.classList.remove('dragging');
+        }
+    }
+    
+    function drag(e) {
+        if (isDragging) {
+            e.preventDefault();
+            
+            if (e.type === "touchmove") {
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+            } else {
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+            }
+            
+            xOffset = currentX;
+            yOffset = currentY;
+            
+            // Constrain to viewport
+            const rect = panel.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+            
+            currentX = Math.max(0, Math.min(currentX, maxX));
+            currentY = Math.max(0, Math.min(currentY, maxY));
+            
+            panel.style.left = currentX + 'px';
+            panel.style.top = currentY + 'px';
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        }
+    }
+    
+    dragHandle.addEventListener('mousedown', dragStart, false);
+    document.addEventListener('mouseup', dragEnd, false);
+    document.addEventListener('mousemove', drag, false);
+    
+    // Touch events
+    dragHandle.addEventListener('touchstart', dragStart, false);
+    document.addEventListener('touchend', dragEnd, false);
+    document.addEventListener('touchmove', drag, false);
+}
+
+function makeResizable(panel, resizeHandle) {
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+    
+    function initResize(e) {
+        isResizing = true;
+        panel.classList.add('resizing');
+        
+        // Bring panel to front when starting to resize
+        bringToFront(panel);
+        
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(window.getComputedStyle(panel).width, 10);
+        startHeight = parseInt(window.getComputedStyle(panel).height, 10);
+        
+        document.addEventListener('mousemove', doResize, false);
+        document.addEventListener('mouseup', stopResize, false);
+        
+        e.preventDefault();
+    }
+    
+    function doResize(e) {
+        if (!isResizing) return;
+        
+        const newWidth = startWidth + e.clientX - startX;
+        const newHeight = startHeight + e.clientY - startY;
+        
+        // Apply minimum constraints
+        const minWidth = parseInt(getComputedStyle(panel).minWidth) || 200;
+        const minHeight = parseInt(getComputedStyle(panel).minHeight) || 150;
+        
+        // Apply maximum constraints (viewport size)
+        const maxWidth = window.innerWidth - panel.offsetLeft - 20;
+        const maxHeight = window.innerHeight - panel.offsetTop - 20;
+        
+        panel.style.width = Math.max(minWidth, Math.min(newWidth, maxWidth)) + 'px';
+        panel.style.height = Math.max(minHeight, Math.min(newHeight, maxHeight)) + 'px';
+        
+        // Trigger resize event for charts if this is analysis panel
+        if (panel.id === 'analysisControls' && window.analysisChart) {
+            // Redraw analysis chart with new dimensions
+            setTimeout(() => {
+                const canvas = document.getElementById('differenceChart');
+                if (canvas && currentAnalysisResult) {
+                    canvas.width = Math.max(300, newWidth - 100);
+                    canvas.height = Math.max(150, Math.min(300, newHeight * 0.4));
+                    drawAnalysisChart(currentAnalysisResult);
+                }
+            }, 10);
+        }
+    }
+    
+    function stopResize() {
+        isResizing = false;
+        panel.classList.remove('resizing');
+        document.removeEventListener('mousemove', doResize, false);
+        document.removeEventListener('mouseup', stopResize, false);
+    }
+    
+    resizeHandle.addEventListener('mousedown', initResize, false);
+}
+
+// Save panel positions and sizes to localStorage
+function savePanelStates() {
+    const panels = ['playbackControls', 'analysisControls', 'gpxFileList'];
+    const states = {};
+    
+    panels.forEach(panelId => {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+            const rect = panel.getBoundingClientRect();
+            states[panelId] = {
+                left: panel.style.left || null,
+                top: panel.style.top || null,
+                right: panel.style.right || null,
+                bottom: panel.style.bottom || null,
+                width: panel.style.width || null,
+                height: panel.style.height || null,
+                zIndex: panel.style.zIndex || null
+            };
+        }
+    });
+    
+    // Also save the current z-index counter
+    states._currentZIndex = currentZIndex;
+    
+    localStorage.setItem('gpxSplitterPanelStates', JSON.stringify(states));
+}
+
+// Restore panel positions and sizes from localStorage
+function restorePanelStates() {
+    const savedStates = localStorage.getItem('gpxSplitterPanelStates');
+    if (!savedStates) return;
+    
+    try {
+        const states = JSON.parse(savedStates);
+        
+        // Restore the z-index counter
+        if (states._currentZIndex) {
+            currentZIndex = states._currentZIndex;
+        }
+        
+        Object.keys(states).forEach(panelId => {
+            if (panelId === '_currentZIndex') return; // Skip the z-index counter
+            
+            const panel = document.getElementById(panelId);
+            const state = states[panelId];
+            
+            if (panel && state) {
+                if (state.left) panel.style.left = state.left;
+                if (state.top) panel.style.top = state.top;
+                if (state.right) panel.style.right = state.right;
+                if (state.bottom) panel.style.bottom = state.bottom;
+                if (state.width) panel.style.width = state.width;
+                if (state.height) panel.style.height = state.height;
+                if (state.zIndex) panel.style.zIndex = state.zIndex;
+            }
+        });
+    } catch (error) {
+        console.warn('Failed to restore panel states:', error);
+    }
+}
+
+// Save states when panels are moved or resized
+window.addEventListener('beforeunload', savePanelStates);
+
+// Restore states on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(restorePanelStates, 100); // Small delay to ensure elements are ready
 });
 
 

@@ -27,8 +27,8 @@
     </div>
     
     <!-- Playback Controls -->
-    <div id="playbackControls" class="playback-controls hidden">
-        <div class="playback-header">
+    <div id="playbackControls" class="playback-controls resizable-panel hidden">
+        <div class="playback-header panel-header">
             <h4>Track Playback</h4>
             <button id="closePlayback" class="close-btn">&times;</button>
         </div>
@@ -72,11 +72,12 @@
                 <input id="progressSlider" type="range" min="0" max="100" value="0" class="progress-slider">
             </div>
         </div>
+        <div class="resize-handle"></div>
     </div>
     
     <!-- Track Analysis Controls -->
-    <div id="analysisControls" class="analysis-controls hidden">
-        <div class="analysis-header">
+    <div id="analysisControls" class="analysis-controls resizable-panel hidden">
+        <div class="analysis-header panel-header">
             <h4>Track Analysis</h4>
             <button id="closeAnalysis" class="close-btn">&times;</button>
         </div>
@@ -93,16 +94,18 @@
                 </div>
             </div>
         </div>
+        <div class="resize-handle"></div>
     </div>
     
-    <div id="gpxFileList" class="gpx-file-list hidden">
-        <div class="file-list-header">
+    <div id="gpxFileList" class="gpx-file-list resizable-panel hidden">
+        <div class="file-list-header panel-header">
             <h3>Loaded GPX Files</h3>
             <button id="closeFileList" class="close-btn">&times;</button>
         </div>
         <div id="fileListContent" class="file-list-content">
             <p class="no-files">No GPX files loaded</p>
         </div>
+        <div class="resize-handle"></div>
     </div>
     
     <div id="map"></div>

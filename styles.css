@@ -127,6 +127,82 @@ body {
 }
 
 /* GPX File List Panel */
+/* Resizable and Draggable Panel Styles */
+.resizable-panel {
+    resize: both;
+    min-width: 200px;
+    min-height: 150px;
+}
+
+.resizable-panel .panel-header {
+    cursor: move;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+.playback-header:hover {
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%), 
+                linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.analysis-header:hover {
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%), 
+                linear-gradient(135deg, #6f42c1 0%, #8e44ad 100%);
+}
+
+.file-list-header:hover {
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%), 
+                linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.resizable-panel .panel-header::after {
+    content: "⋮⋮";
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.resizable-panel .resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: se-resize;
+    background: linear-gradient(-45deg, transparent 40%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.1) 60%, transparent 60%);
+    background-size: 4px 4px;
+    border-top-left-radius: 10px;
+}
+
+.resizable-panel .resize-handle:hover {
+    background: linear-gradient(-45deg, transparent 40%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.2) 60%, transparent 60%);
+    background-size: 4px 4px;
+}
+
+/* Touch devices - larger resize handle */
+@media (pointer: coarse) {
+    .resizable-panel .resize-handle {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+.resizable-panel.dragging {
+    transition: none;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+    transform: rotate(0.5deg);
+}
+
+.resizable-panel.resizing {
+    transition: none;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
 .gpx-file-list {
     position: absolute;
     top: 80px;
@@ -184,8 +260,9 @@ body {
 }
 
 .file-list-content {
-    max-height: 320px;
+    max-height: calc(100% - 60px);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 10px;
 }
 
@@ -341,13 +418,13 @@ body {
 /* GPX Track styling */
 .gpx-track {
     color: #ff6b35 !important;
-    weight: 4;
+    stroke-width: 4;
     opacity: 0.8;
 }
 
 .gpx-waypoint {
     color: #ff6b35;
-    fill-color: #ff6b35;
+    background-color: #ff6b35;
     fill-opacity: 0.7;
 }
 
@@ -424,6 +501,9 @@ body {
     z-index: 1000;
     transition: all 0.3s ease;
     overflow: hidden;
+    resize: both;
+    min-width: 280px;
+    min-height: 200px;
 }
 
 .playback-controls.hidden {
@@ -449,6 +529,8 @@ body {
 
 .playback-content {
     padding: 16px;
+    overflow-y: auto;
+    max-height: calc(100% - 60px);
 }
 
 .track-count-info {
@@ -723,6 +805,9 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    resize: both;
+    min-width: 350px;
+    min-height: 300px;
 }
 
 .analysis-controls.hidden {
