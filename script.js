@@ -5,7 +5,7 @@ const yllasCoordinates = [67.55855, 24.24288];
 const map = L.map('map', {
     center: yllasCoordinates,
     zoom: 13,
-    zoomControl: true,
+    zoomControl: false, // Disable default zoom control to reposition it
     attributionControl: true
 });
 
@@ -29,9 +29,46 @@ const baseMaps = {
     "Satellite": satelliteLayer
 };
 
-L.control.layers(baseMaps).addTo(map);
+// Add zoom control to top right
+const zoomControl = L.control.zoom({
+    position: 'topright'
+}).addTo(map);
 
-// Add scale control
+// Add layer control to top right, positioned next to zoom control
+const layerControl = L.control.layers(baseMaps, null, {
+    position: 'topright'
+}).addTo(map);
+
+// Position controls side-by-side by adjusting the layer control margin
+setTimeout(() => {
+    const zoomElement = zoomControl.getContainer();
+    const layerElement = layerControl.getContainer();
+    
+    if (zoomElement && layerElement) {
+        // Add custom styling to position controls side-by-side
+        zoomElement.style.marginRight = '10px';
+        layerElement.style.clear = 'none';
+        layerElement.style.marginTop = '0';
+        
+        // Create a container for both controls
+        const controlsContainer = document.createElement('div');
+        controlsContainer.style.display = 'flex';
+        controlsContainer.style.alignItems = 'flex-start';
+        controlsContainer.style.gap = '10px';
+        controlsContainer.style.position = 'absolute';
+        controlsContainer.style.top = '10px';
+        controlsContainer.style.right = '10px';
+        controlsContainer.style.zIndex = '1000';
+        
+        // Move both controls to the new container
+        const mapContainer = map.getContainer();
+        mapContainer.appendChild(controlsContainer);
+        controlsContainer.appendChild(layerElement);
+        controlsContainer.appendChild(zoomElement);
+    }
+}, 100);
+
+// Add scale control to bottom right
 L.control.scale({
     position: 'bottomright',
     metric: true,
