@@ -3,9 +3,9 @@
  * Initializes the application and wires up all modules
  */
 
-import { initializeMap } from './js/map/mapManager.js';
+import { MapManager } from './js/map/mapManager.js';
 import { LineManager } from './js/map/lineManager.js';
-import { initializePanelManager } from './js/ui/panelManager.js';
+import { initializePanelDragAndResize } from './js/ui/panelManager.js';
 import { initializeEventHandlers } from './js/events/eventHandlers.js';
 
 /**
@@ -13,16 +13,17 @@ import { initializeEventHandlers } from './js/events/eventHandlers.js';
  */
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the map
-    const map = initializeMap();
+    const mapManager = new MapManager();
+    const map = mapManager.initialize();
     
-    // Initialize line manager
-    const lineManager = new LineManager(map);
+    // Initialize line manager with the lines group from map manager
+    const lineManager = new LineManager(map, mapManager.getLinesGroup());
     
-    // Create playback layer
-    const playbackLayer = L.layerGroup().addTo(map);
+    // Get playback layer from map manager
+    const playbackLayer = mapManager.getPlaybackLayer();
     
     // Initialize draggable/resizable panels
-    initializePanelManager();
+    initializePanelDragAndResize();
     
     // Initialize all event handlers
     initializeEventHandlers(map, lineManager, playbackLayer);

@@ -12,7 +12,7 @@ import { gpxFiles, setBaselineSelection, getBaselineSelection, playbackState, re
 import { calculateTrackAnalysis } from '../analysis/analyzer.js';
 import { drawAnalysisChart, handleChartClick, drawPlaybackMarkers } from '../analysis/chartRenderer.js';
 import { showAnalysisPanel, hideAnalysisPanel, updateAnalysisInfo, updateAnalysisStats, showAnalysisError } from '../analysis/analysisUI.js';
-import { prepareTracksForPlayback, seekToPosition, seekPlaybackToDistance, getPlaybackStatusMessage } from '../playback/playbackManager.js';
+import { prepareTracksForPlayback, seekToPosition, seekPlaybackToDistance, getPlaybackStatusMessage, updateTrackPosition } from '../playback/playbackManager.js';
 import { 
     createTrackPlaybackMarker, 
     updatePlaybackProgress, 
@@ -485,21 +485,115 @@ function animatePlayback() {
     if (!playbackState.isPlaying || playbackState.isPaused) return;
     
     const now = Date.now();
+    const deltaTime = now - playbackState.lastUpdateTime;
+    
+    // Update tracks based on realtime timestamps
+    let hasActiveMarkers = false;
     
     playbackState.tracks.forEach(track => {
         const file = gpxFiles.get(track.fileId);
-        if (!file || !file.visible || track.isComplete) return;
+        const isTrackVisible = file && file.visible;
         
-        // Implementation simplified - see original for full logic
-        const currentPoint = track.points[track.currentPointIndex];
-        if (currentPoint) {
-            createTrackPlaybackMarker(track, currentPoint.lat, currentPoint.lng, playbackLayer);
-        }
-        
-        // Simple advancement
-        track.currentPointIndex++;
-        if (track.currentPointIndex > track.endIndex) {
-            track.isComplete = true;
+        if (!track.isComplete && track.currentPointIndex <= track.endIndex) {
+            const currentPoint = track.points[track.currentPointIndex];
+            const nextPoint = track.points[track.currentPointIndex + 1];
+            
+            // Check if it's time to advance to the next point
+            let shouldAdvance = false;
+            
+            if (track.startTime === null) {
+                // First point - initialize timing and position
+                track.startTime = now;
+                
+                // Initialize position based on interpolation mode
+                const position = updateTrackPosition(track);
+                createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
+                
+                // Set flags based on start line
+                if (track.interpolatedStart && track.hasStartLine) {
+                    track.usingInterpolatedStart = true;
+                } else {
+                    track.usingInterpolatedStart = false;
+                }
+                
+                track.trackStartTime = track.points[track.currentPointIndex].time ? 
+                    new Date(track.points[track.currentPointIndex].time).getTime() : null;
+                if (isTrackVisible) hasActiveMarkers = true;
+            } else if (track.trackStartTime && currentPoint.time) {
+                // Calculate elapsed time in track vs real playback time
+                let targetTime;
+                
+                if (track.usingInterpolatedStart) {
+                    // When using interpolated start, add a small delay before moving to first GPS point
+                    const interpolatedDelay = 500; // 0.5 second delay at start line
+                    const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                    
+                    if (realElapsed >= interpolatedDelay) {
+                        shouldAdvance = true;
+                    } else {
+                        hasActiveMarkers = true;
+                    }
+                } else if (nextPoint && nextPoint.time) {
+                    // Normal advancement - use next point's time
+                    targetTime = new Date(nextPoint.time).getTime();
+                    const trackElapsed = targetTime - track.trackStartTime;
+                    const realElapsed = ((now - track.startTime) - track.pausedTime) * playbackState.speed;
+                    shouldAdvance = realElapsed >= trackElapsed;
+                } else {
+                    hasActiveMarkers = true;
+                }
+            } else {
+                // No timestamp data, fall back to regular interval
+                const interval = 1000 / playbackState.speed;
+                shouldAdvance = deltaTime >= interval;
+                if (isTrackVisible) hasActiveMarkers = true;
+            }
+            
+            if (shouldAdvance && track.startTime !== null) {
+                if (track.usingInterpolatedStart) {
+                    // Transition from interpolated start to first actual GPS point
+                    if (playbackState.smoothInterpolation) {
+                        track.currentPosition = { ...track.interpolatedStart };
+                        track.targetPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
+                        track.interpolationProgress = 0;
+                    }
+                    track.usingInterpolatedStart = false;
+                } else {
+                    // Normal advancement - move to the next point
+                    track.currentPointIndex++;
+                    if (track.currentPointIndex <= track.endIndex && track.currentPointIndex < track.points.length) {
+                        const nextGpsPoint = track.points[track.currentPointIndex];
+                        if (playbackState.smoothInterpolation && track.currentPosition) {
+                            track.currentPosition = { ...track.targetPosition };
+                            track.targetPosition = { lat: nextGpsPoint.lat, lng: nextGpsPoint.lng };
+                            track.interpolationProgress = 0;
+                        }
+                    }
+                }
+                
+                if (isTrackVisible) hasActiveMarkers = true;
+                
+                // Mark track as complete if we've reached the end
+                if (track.currentPointIndex > track.endIndex) {
+                    track.isComplete = true;
+                }
+            } else if (playbackState.smoothInterpolation && track.currentPosition && track.targetPosition) {
+                // Update interpolation progress for smooth movement
+                const frameTime = deltaTime / 1000;
+                const interpolationSpeed = playbackState.speed;
+                track.interpolationProgress = Math.min(1, track.interpolationProgress + frameTime * interpolationSpeed);
+                if (isTrackVisible) hasActiveMarkers = true;
+            } else {
+                if (isTrackVisible) hasActiveMarkers = true;
+            }
+            
+            // Update marker position
+            if (track.currentPosition || !playbackState.smoothInterpolation) {
+                const position = updateTrackPosition(track);
+                if (position) {
+                    createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
+                }
+            }
         }
     });
     
@@ -508,6 +602,22 @@ function animatePlayback() {
     
     if (currentAnalysisChart) {
         drawPlaybackMarkers(currentAnalysisChart);
+    }
+    
+    // Check if all tracks are complete
+    if (!hasActiveMarkers) {
+        const hasVisibleTracks = playbackState.tracks.some(track => {
+            const file = gpxFiles.get(track.fileId);
+            return file && file.visible;
+        });
+        
+        if (!hasVisibleTracks) {
+            console.log('No visible tracks - stopping playback');
+        } else {
+            console.log('All visible tracks completed - stopping playback');
+        }
+        stopPlayback();
+        return;
     }
     
     playbackState.lastUpdateTime = now;
