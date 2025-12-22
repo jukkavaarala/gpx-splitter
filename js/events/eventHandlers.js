@@ -288,11 +288,19 @@ function setupPlaybackHandlers() {
 
     document.getElementById('smoothInterpolation')?.addEventListener('change', function() {
         playbackState.smoothInterpolation = this.checked;
-        playbackState.tracks.forEach(track => {
-            track.currentPosition = null;
-            track.targetPosition = null;
-            track.interpolationProgress = 0;
-        });
+        
+        // When enabling smooth interpolation during playback, don't reset positions
+        // Let it naturally transition to smooth mode at the next point advancement
+        // When disabling smooth interpolation, clear the interpolation data immediately
+        if (!this.checked && playbackState.tracks) {
+            playbackState.tracks.forEach(track => {
+                track.currentPosition = null;
+                track.targetPosition = null;
+                track.interpolationProgress = 0;
+            });
+        }
+        // When enabling smooth mode, don't touch the positions - they'll be set up
+        // naturally when the next point is reached in the animation loop
     });
 
     document.getElementById('followLocation')?.addEventListener('change', function() {
@@ -563,8 +571,16 @@ function animatePlayback() {
                     track.currentPointIndex++;
                     if (track.currentPointIndex <= track.endIndex && track.currentPointIndex < track.points.length) {
                         const nextGpsPoint = track.points[track.currentPointIndex];
-                        if (playbackState.smoothInterpolation && track.currentPosition) {
-                            track.currentPosition = { ...track.targetPosition };
+                        if (playbackState.smoothInterpolation) {
+                            // Initialize or update smooth interpolation
+                            if (track.currentPosition) {
+                                // Already initialized - advance from target to next point
+                                track.currentPosition = { ...track.targetPosition };
+                            } else {
+                                // First time initializing after enabling smooth mode - start from current point
+                                const currentGpsPoint = track.points[track.currentPointIndex];
+                                track.currentPosition = { lat: currentGpsPoint.lat, lng: currentGpsPoint.lng };
+                            }
                             track.targetPosition = { lat: nextGpsPoint.lat, lng: nextGpsPoint.lng };
                             track.interpolationProgress = 0;
                         }
@@ -588,11 +604,20 @@ function animatePlayback() {
             }
             
             // Update marker position
-            if (track.currentPosition || !playbackState.smoothInterpolation) {
-                const position = updateTrackPosition(track);
-                if (position) {
-                    createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
-                }
+            // Use jump mode if smooth interpolation is enabled but positions not yet initialized
+            // This prevents skip when toggling smooth mode mid-playback
+            let position;
+            if (playbackState.smoothInterpolation && !track.currentPosition) {
+                // Smooth mode enabled but not initialized yet - use jump mode temporarily
+                const currentPoint = track.points[track.currentPointIndex];
+                position = { lat: currentPoint.lat, lng: currentPoint.lng };
+            } else {
+                // Normal operation - use updateTrackPosition
+                position = updateTrackPosition(track);
+            }
+            
+            if (position && isTrackVisible) {
+                createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
             }
         }
     });
