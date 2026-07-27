@@ -25,6 +25,7 @@ import {
 
 let map, lineManager, playbackLayer;
 let currentAnalysisChart = null;
+let isUpdatingAnalysis = false;
 
 /**
  * Initialize event handlers
@@ -324,42 +325,67 @@ function setupPlaybackHandlers() {
  */
 function setupAnalysisHandlers() {
     document.getElementById('analyzeTracks')?.addEventListener('click', function() {
-        const result = calculateTrackAnalysis(lineManager.getStartLine(), lineManager.getFinishLine());
-        
-        if (!result.success) {
-            showAnalysisError(result.message);
-            return;
-        }
-        
-        showAnalysisPanel();
-        updateAnalysisInfo(result);
-        
-        const canvas = document.getElementById('differenceChart');
-        if (canvas) {
-            currentAnalysisChart = drawAnalysisChart(result, canvas);
-            
-            // Add click handler for seeking
-            if (!canvas.hasClickListener) {
-                canvas.addEventListener('click', function(e) {
-                    const distance = handleChartClick(e, currentAnalysisChart);
-                    if (distance !== null) {
-                        seekPlaybackToDistance(distance);
-                        updatePlaybackProgress();
-                        
-                        if (currentAnalysisChart) {
-                            drawPlaybackMarkers(currentAnalysisChart);
-                        }
-                    }
-                });
-                canvas.hasClickListener = true;
-                canvas.style.cursor = 'pointer';
-            }
-        }
-        
-        updateAnalysisStats(result);
+        updateTrackAnalysis();
     });
 
     document.getElementById('closeAnalysis')?.addEventListener('click', hideAnalysisPanel);
+}
+
+/**
+ * Recalculate and render the track analysis
+ */
+function updateTrackAnalysis() {
+    if (isUpdatingAnalysis) return;
+    isUpdatingAnalysis = true;
+
+    const result = calculateTrackAnalysis(lineManager.getStartLine(), lineManager.getFinishLine());
+
+    if (!result.success) {
+        showAnalysisError(result.message);
+        isUpdatingAnalysis = false;
+        return;
+    }
+
+    const baselineLapNumber = result.baseline.lapNumber ?? null;
+    setBaselineSelection(
+        result.baseline.fileId,
+        result.baseline.trackIndex,
+        baselineLapNumber
+    );
+    refreshUI();
+
+    showAnalysisPanel();
+    updateAnalysisInfo(result);
+
+    const canvas = document.getElementById('differenceChart');
+    if (canvas) {
+        currentAnalysisChart = drawAnalysisChart(result, canvas);
+
+        // Add click handler for seeking
+        if (!canvas.hasClickListener) {
+            canvas.addEventListener('click', function(e) {
+                const distance = handleChartClick(e, currentAnalysisChart);
+                if (distance !== null) {
+                    seekPlaybackToDistance(distance);
+                    updatePlaybackProgress();
+
+                    if (currentAnalysisChart) {
+                        drawPlaybackMarkers(currentAnalysisChart);
+                    }
+                }
+            });
+            canvas.hasClickListener = true;
+            canvas.style.cursor = 'pointer';
+        }
+    }
+
+    updateAnalysisStats(result);
+
+    if (currentAnalysisChart && playbackState.tracks.length > 0) {
+        drawPlaybackMarkers(currentAnalysisChart);
+    }
+
+    isUpdatingAnalysis = false;
 }
 
 /**
@@ -665,5 +691,9 @@ function refreshUI() {
     const bounds = getVisibleBounds();
     if (bounds.length > 0) {
         map.fitBounds(L.latLngBounds(bounds), { padding: [20, 20] });
+    }
+
+    if (!isUpdatingAnalysis && !document.getElementById('analysisControls')?.classList.contains('hidden')) {
+        updateTrackAnalysis();
     }
 }

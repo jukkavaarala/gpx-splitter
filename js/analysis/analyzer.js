@@ -117,7 +117,7 @@ function getVisibleTracks(startLine, finishLine) {
                                     fileId: fileId,
                                     fileName: trackName,
                                     trackIndex: trackIndex,
-                                    lapNumber: lap.lapNumber || 1,
+                            lapNumber: laps.length > 1 ? lap.lapNumber : undefined,
                                     points: trackPoints,
                                     color: file.color,
                                     segment: lap
@@ -145,7 +145,8 @@ function findBaselineTrack(visibleTracks) {
         for (let i = 0; i < visibleTracks.length; i++) {
             const track = visibleTracks[i];
             
-            if (track.fileId === baseline.fileId) {
+            if (track.fileId === baseline.fileId &&
+                track.trackIndex === baseline.trackIndex) {
                 const lapMatches = (baseline.lapNumber === null && track.lapNumber === undefined) ||
                                  (baseline.lapNumber !== null && track.lapNumber === baseline.lapNumber);
                 
