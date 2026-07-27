@@ -242,8 +242,8 @@ body {
 .close-btn {
     background: none;
     border: none;
-    color: white;
-    font-size: 24px;
+    color: transparent;
+    font-size: 0;
     cursor: pointer;
     padding: 0;
     width: 30px;
@@ -253,6 +253,27 @@ body {
     justify-content: center;
     border-radius: 50%;
     transition: background-color 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Create clean × using pseudo-elements */
+.close-btn::before,
+.close-btn::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 2px;
+    background: white;
+    border-radius: 1px;
+}
+
+.close-btn::before {
+    transform: rotate(45deg);
+}
+
+.close-btn::after {
+    transform: rotate(-45deg);
 }
 
 .close-btn:hover {
@@ -632,6 +653,19 @@ body {
     background: white;
 }
 
+.smooth-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.smooth-control label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 12px;
+    cursor: pointer;
+}
+
 .follow-control {
     display: flex;
     align-items: center;
@@ -645,6 +679,7 @@ body {
     cursor: pointer;
 }
 
+.smooth-control input[type="checkbox"],
 .follow-control input[type="checkbox"] {
     width: 16px;
     height: 16px;
@@ -867,7 +902,7 @@ body {
     background: #f8f9fa;
     border-radius: 8px;
     padding: 12px;
-    border-left: 4px solid #6f42c1;
+    border-left: 4px solid transparent;
     max-height: 200px;
     overflow-y: auto;
     flex-shrink: 0;

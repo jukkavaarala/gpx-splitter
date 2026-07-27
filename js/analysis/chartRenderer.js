@@ -192,8 +192,19 @@ function drawLegend(ctx, canvas, analysisResult, padding) {
 export function drawPlaybackMarkers(chartData) {
     if (!chartData || playbackState.tracks.length === 0) return;
     
-    const { ctx, canvas, padding, chartWidth, chartHeight, maxDistance, analysisResult, zeroY } = chartData;
+    const { ctx, canvas, padding, chartWidth, chartHeight, maxDistance, analysisResult, zeroY, maxTimeDiff } = chartData;
     
+    // Clear the entire canvas first to prevent ghosting
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Redraw the chart components
+    drawAxes(ctx, canvas, padding, chartWidth, chartHeight, zeroY);
+    drawGrid(ctx, padding, chartWidth, chartHeight);
+    drawLabels(ctx, canvas, padding, chartWidth, chartHeight, maxDistance, maxTimeDiff, zeroY);
+    drawDataLines(ctx, analysisResult, padding, chartWidth, chartHeight, maxDistance, maxTimeDiff, zeroY);
+    drawLegend(ctx, canvas, analysisResult, padding);
+    
+    // Now draw the playback markers on top
     playbackState.tracks.forEach(track => {
         if (track.currentPointIndex < track.startIndex || track.currentPointIndex > track.endIndex) return;
         

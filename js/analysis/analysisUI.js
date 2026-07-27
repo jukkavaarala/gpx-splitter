@@ -50,6 +50,14 @@ export function updateAnalysisInfo(analysisResult) {
 export function updateAnalysisStats(analysisResult) {
     const statsContainer = document.getElementById('analysisStats');
     if (!statsContainer) return;
+    const statsPanel = statsContainer.closest('.analysis-stats');
+    if (statsPanel && analysisResult?.baseline?.color) {
+        statsPanel.style.setProperty(
+            'border-left',
+            `4px solid ${analysisResult.baseline.color}`,
+            'important'
+        );
+    }
     
     // Calculate baseline statistics
     const baselineDistance = calculateTrackDistance(analysisResult.baseline.points);
