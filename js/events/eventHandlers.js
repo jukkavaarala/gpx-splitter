@@ -373,7 +373,34 @@ function setupAnalysisHandlers() {
         updateTrackAnalysis();
     });
 
+    const chartContainer = document.getElementById('analysisChart');
+    if (chartContainer && typeof ResizeObserver !== 'undefined') {
+        const chartResizeObserver = new ResizeObserver(() => resizeAnalysisChart());
+        chartResizeObserver.observe(chartContainer);
+    }
+
     document.getElementById('closeAnalysis')?.addEventListener('click', hideAnalysisPanel);
+}
+
+/**
+ * Resize and redraw the analysis chart at the container's native resolution
+ */
+function resizeAnalysisChart() {
+    const canvas = document.getElementById('differenceChart');
+    const chartContainer = document.getElementById('analysisChart');
+    if (!canvas || !chartContainer || !currentAnalysisChart) return;
+
+    const width = Math.max(400, Math.floor(chartContainer.clientWidth - 24));
+    const height = Math.max(200, Math.round(width / 2));
+    if (canvas.width === width && canvas.height === height) return;
+
+    canvas.width = width;
+    canvas.height = height;
+    currentAnalysisChart = drawAnalysisChart(currentAnalysisChart.analysisResult, canvas);
+
+    if (playbackState.tracks.length > 0) {
+        drawPlaybackMarkers(currentAnalysisChart);
+    }
 }
 
 /**

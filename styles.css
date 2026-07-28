@@ -901,8 +901,33 @@ body {
 }
 
 .analysis-chart canvas {
+    width: 100%;
     max-width: 100%;
     height: auto;
+}
+
+.analysis-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 11px;
+}
+
+.analysis-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.analysis-legend-color {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 2px;
 }
 
 .analysis-stats {

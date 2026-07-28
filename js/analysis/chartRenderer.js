@@ -45,9 +45,6 @@ export function drawAnalysisChart(analysisResult, canvas) {
     // Draw data lines
     drawDataLines(ctx, analysisResult, padding, chartWidth, chartHeight, maxDistance, maxTimeDiff, zeroY);
     
-    // Draw legend
-    drawLegend(ctx, canvas, analysisResult, padding);
-    
     // Return chart metadata
     return {
         canvas,
@@ -174,28 +171,6 @@ function drawDataLines(ctx, analysisResult, padding, chartWidth, chartHeight, ma
 }
 
 /**
- * Draw legend
- */
-function drawLegend(ctx, canvas, analysisResult, padding) {
-    let legendY = padding + 10;
-    
-    ctx.fillStyle = '#333';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'left';
-    
-    ctx.fillText('Baseline: ' + analysisResult.baseline.fileName, canvas.width - padding - 120, legendY);
-    legendY += 12;
-    
-    analysisResult.comparisons.forEach((comparison) => {
-        ctx.fillStyle = comparison.color;
-        ctx.fillRect(canvas.width - padding - 120, legendY, 8, 8);
-        ctx.fillStyle = '#333';
-        ctx.fillText(comparison.fileName, canvas.width - padding - 108, legendY + 7);
-        legendY += 12;
-    });
-}
-
-/**
  * Draw playback position markers on chart
  */
 export function drawPlaybackMarkers(chartData) {
@@ -223,6 +198,14 @@ export function drawPlaybackMarkers(chartData) {
         const currentDistance = cumulativeDistances[track.currentPointIndex] -
             cumulativeDistances[track.startIndex];
         const distanceKm = currentDistance / 1000;
+
+        if (matchingTrack !== analysisResult.baseline && matchingTrack.timeDifferences?.length > 0) {
+            const closestDiff = matchingTrack.timeDifferences.reduce((closest, difference) =>
+                Math.abs(difference.distance - currentDistance) <
+                    Math.abs(closest.distance - currentDistance) ? difference : closest
+            );
+            updateLegendDelta(matchingTrack, closestDiff.timeDifference);
+        }
         
         // Draw vertical marker line
         const x = padding + (distanceKm / maxDistance) * chartWidth;
@@ -247,8 +230,9 @@ export function drawPlaybackMarkers(chartData) {
         
         // Draw time difference text for comparison tracks
         if (matchingTrack !== analysisResult.baseline && matchingTrack.timeDifferences) {
-            const closestDiff = matchingTrack.timeDifferences.find(d => 
-                Math.abs(d.distance - distanceKm * 1000) < 50
+            const closestDiff = matchingTrack.timeDifferences.reduce((closest, difference) =>
+                Math.abs(difference.distance - distanceKm * 1000) <
+                    Math.abs(closest.distance - distanceKm * 1000) ? difference : closest
             );
             if (closestDiff) {
                 ctx.fillStyle = matchingTrack.color;
@@ -260,6 +244,14 @@ export function drawPlaybackMarkers(chartData) {
             }
         }
     });
+}
+
+function updateLegendDelta(track, timeDifference) {
+    const selector = `.analysis-legend-delta[data-file-id="${track.fileId}"][data-track-index="${track.trackIndex}"][data-lap-number="${track.lapNumber ?? ''}"]`;
+    const deltaElement = document.querySelector(selector);
+    if (deltaElement) {
+        deltaElement.textContent = `${timeDifference >= 0 ? '+' : ''}${timeDifference.toFixed(1)}s`;
+    }
 }
 
 /**

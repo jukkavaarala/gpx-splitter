@@ -50,6 +50,29 @@ export function updateAnalysisInfo(analysisResult) {
 export function updateAnalysisStats(analysisResult) {
     const statsContainer = document.getElementById('analysisStats');
     if (!statsContainer) return;
+
+    const legendContainer = document.getElementById('analysisLegend');
+    if (legendContainer) {
+        let legendHtml = `
+            <div class="analysis-legend-item">
+                <span class="analysis-legend-color" style="background-color: ${analysisResult.baseline.color};"></span>
+                <span>Baseline: ${analysisResult.baseline.fileName} (<span class="analysis-legend-delta">0.0s</span>)</span>
+            </div>
+        `;
+
+        analysisResult.comparisons.forEach(comparison => {
+            const finalDifference = comparison.stats?.finalDifference ?? 0;
+            const finalDifferenceText = `${finalDifference >= 0 ? '+' : ''}${finalDifference.toFixed(1)}s`;
+            legendHtml += `
+                <div class="analysis-legend-item">
+                    <span class="analysis-legend-color" style="background-color: ${comparison.color};"></span>
+                    <span>${comparison.fileName} (<span class="analysis-legend-delta" data-file-id="${comparison.fileId}" data-track-index="${comparison.trackIndex}" data-lap-number="${comparison.lapNumber ?? ''}">${finalDifferenceText}</span>)</span>
+                </div>
+            `;
+        });
+
+        legendContainer.innerHTML = legendHtml;
+    }
     const statsPanel = statsContainer.closest('.analysis-stats');
     if (statsPanel && analysisResult?.baseline?.color) {
         statsPanel.style.setProperty(
