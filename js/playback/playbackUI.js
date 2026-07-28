@@ -163,6 +163,8 @@ export function showPlaybackControls() {
     const controls = document.getElementById('playbackControls');
     if (controls) {
         controls.classList.remove('hidden');
+        const toggleButton = document.getElementById('togglePlayback');
+        if (toggleButton) toggleButton.textContent = 'Hide Playback';
     }
 }
 
@@ -173,6 +175,8 @@ export function hidePlaybackControls() {
     const controls = document.getElementById('playbackControls');
     if (controls) {
         controls.classList.add('hidden');
+        const toggleButton = document.getElementById('togglePlayback');
+        if (toggleButton) toggleButton.textContent = 'Show Playback';
     }
 }
 

@@ -288,6 +288,14 @@ function setupFileListHandlers() {
  */
 function setupPlaybackHandlers() {
     window.handleStartPlayback = startPlayback;
+
+    document.getElementById('togglePlayback')?.addEventListener('click', function() {
+        const controls = document.getElementById('playbackControls');
+        if (!controls) return;
+
+        const isHidden = controls.classList.toggle('hidden');
+        this.textContent = isHidden ? 'Show Playback' : 'Hide Playback';
+    });
     
     document.getElementById('playPauseBtn')?.addEventListener('click', function() {
         if (!playbackState.isPlaying) {
@@ -304,6 +312,8 @@ function setupPlaybackHandlers() {
     document.getElementById('closePlayback')?.addEventListener('click', function() {
         stopPlayback();
         document.getElementById('playbackControls')?.classList.add('hidden');
+        const toggleButton = document.getElementById('togglePlayback');
+        if (toggleButton) toggleButton.textContent = 'Show Playback';
     });
 
     document.getElementById('playbackSpeed')?.addEventListener('change', function() {

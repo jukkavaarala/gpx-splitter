@@ -40,11 +40,6 @@ export function updateFileList(callbacks, selectedBaselineFileId, selectedBaseli
         }
     });
     
-    // Add global playback button
-    if (gpxFiles.size > 0) {
-        html += renderPlaybackButton(callbacks);
-    }
-    
     content.innerHTML = html;
 }
 
@@ -197,25 +192,6 @@ function renderFileGroup(baseName, files, callbacks, selectedBaselineFileId, sel
     `;
     
     return html;
-}
-
-/**
- * Render global playback button
- */
-function renderPlaybackButton(callbacks) {
-    return `
-        <div class="file-item" style="border-top: 2px solid #dee2e6; margin-top: 8px; padding-top: 12px;">
-            <div class="file-info">
-                <div class="file-name">Track Playback</div>
-                <div class="file-stats">Animate visible tracks</div>
-            </div>
-            <div class="file-actions">
-                <button class="file-btn" onclick="handleStartPlayback()" title="Start playback">
-                    ▶
-                </button>
-            </div>
-        </div>
-    `;
 }
 
 /**
