@@ -5,7 +5,8 @@
 
 import { gpxFiles, getNextFileId } from '../state.js';
 import { generateColor } from '../utils/colors.js';
-import { GPX_TRACK_STYLE, GPX_WAYPOINT_STYLE } from '../config.js';
+import { GPX_TRACK_STYLE, GPX_WAYPOINT_STYLE, PLAYBACK_CONFIG } from '../config.js';
+import { createSmoothedPlaybackPoints } from '../utils/geometry.js';
 
 /**
  * Create Leaflet layers from GPX data
@@ -105,6 +106,16 @@ export function createGpxLayers(gpxData, color, fileName, map) {
 export function addGpxFile(fileName, gpxData, map, color = null) {
     const fileId = getNextFileId();
     const fileColor = color || generateColor(gpxFiles.size);
+
+    gpxData.tracks.forEach(track => {
+        if (!track.playbackPoints) {
+            track.playbackPoints = createSmoothedPlaybackPoints(
+                track.points,
+                PLAYBACK_CONFIG.SMOOTHING_SUBDIVISIONS
+            );
+        }
+    });
+
     const { layers, totalPoints } = createGpxLayers(gpxData, fileColor, fileName, map);
     
     // Add layers to map

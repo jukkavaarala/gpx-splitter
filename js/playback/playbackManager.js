@@ -5,7 +5,7 @@
 
 import { playbackState, gpxFiles } from '../state.js';
 import { findTrackLaps } from '../gpx/intersection.js';
-import { interpolatePosition, calculateCumulativeDistances } from '../utils/geometry.js';
+import { calculateCumulativeDistances } from '../utils/geometry.js';
 import { PLAYBACK_CONFIG } from '../config.js';
 
 /**
@@ -22,6 +22,10 @@ export function prepareTracksForPlayback(startLine, finishLine) {
         if (file.visible && file.data.tracks.length > 0) {
             file.data.tracks.forEach((track, trackIndex) => {
                 if (track.points.length > 0) {
+                    const smoothedPoints = track.playbackPoints || track.points;
+                    const smoothingFactor = track.points.length > 1 ?
+                        (smoothedPoints.length - 1) / (track.points.length - 1) : 1;
+                    const playbackPoints = playbackState.smoothInterpolation ? smoothedPoints : track.points;
                     const laps = findTrackLaps(track, startLine, finishLine);
                     
                     laps.forEach((lap, lapIndex) => {
@@ -30,17 +34,23 @@ export function prepareTracksForPlayback(startLine, finishLine) {
                             trackDisplayName = `${file.fileName} (Lap ${lap.lapNumber})`;
                         }
                         
+                        const startIndex = playbackState.smoothInterpolation ?
+                            Math.round(lap.startIndex * smoothingFactor) : lap.startIndex;
+                        const endIndex = playbackState.smoothInterpolation ?
+                            Math.round(lap.endIndex * smoothingFactor) : lap.endIndex;
                         const trackData = {
                             fileId: fileId,
                             fileName: file.fileName,
                             trackName: trackDisplayName,
                             trackIndex: trackIndex,
                             color: file.color,
-                            points: track.points,
-                            startIndex: lap.startIndex,
-                            endIndex: lap.endIndex,
-                            currentPointIndex: lap.startIndex,
-                            segmentPoints: lap.totalPoints,
+                            points: playbackPoints,
+                            sourcePointCount: track.points.length,
+                            playbackPointCount: playbackPoints.length,
+                            startIndex: startIndex,
+                            endIndex: endIndex,
+                            currentPointIndex: startIndex,
+                            segmentPoints: endIndex - startIndex + 1,
                             hasStartLine: lap.hasStartLine,
                             hasFinishLine: lap.hasFinishLine,
                             interpolatedStart: lap.interpolatedStart,
@@ -58,8 +68,8 @@ export function prepareTracksForPlayback(startLine, finishLine) {
                         };
                         
                         // Set track start time if available
-                        if (track.points[lap.startIndex]?.time) {
-                            trackData.trackStartTime = new Date(track.points[lap.startIndex].time).getTime();
+                        if (playbackPoints[startIndex]?.time) {
+                            trackData.trackStartTime = new Date(playbackPoints[startIndex].time).getTime();
                         }
                         
                         tracks.push(trackData);
@@ -79,35 +89,12 @@ export function prepareTracksForPlayback(startLine, finishLine) {
  * @returns {Object} Current position {lat, lng}
  */
 export function updateTrackPosition(track) {
-    if (!playbackState.smoothInterpolation) {
-        // Jump mode - use exact GPS point positions
-        const currentPoint = track.points[track.currentPointIndex];
-        if (track.usingInterpolatedStart && track.interpolatedStart) {
-            return track.interpolatedStart;
-        }
-        return { lat: currentPoint.lat, lng: currentPoint.lng };
+    const currentPoint = track.points[track.currentPointIndex];
+    if (!currentPoint) return null;
+    if (track.usingInterpolatedStart && track.interpolatedStart) {
+        return track.interpolatedStart;
     }
-    
-    // Smooth interpolation mode
-    if (!track.currentPosition) {
-        // Initialize position
-        const currentPoint = track.points[track.currentPointIndex];
-        if (track.usingInterpolatedStart && track.interpolatedStart) {
-            track.currentPosition = { ...track.interpolatedStart };
-            track.targetPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
-        } else {
-            track.currentPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
-            const nextPoint = track.points[track.currentPointIndex + 1];
-            if (nextPoint) {
-                track.targetPosition = { lat: nextPoint.lat, lng: nextPoint.lng };
-            }
-        }
-        track.interpolationProgress = 0;
-        return track.currentPosition;
-    }
-    
-    // Return interpolated position
-    return interpolatePosition(track.currentPosition, track.targetPosition, track.interpolationProgress);
+    return { lat: currentPoint.lat, lng: currentPoint.lng };
 }
 
 /**

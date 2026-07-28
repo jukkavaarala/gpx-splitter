@@ -6,6 +6,8 @@
 import { playbackState, gpxFiles } from '../state.js';
 import { calculateCumulativeDistances } from '../utils/geometry.js';
 
+const cumulativeDistanceCache = new WeakMap();
+
 /**
  * Draw analysis chart
  * @param {Object} analysisResult - Analysis result object
@@ -56,7 +58,14 @@ export function drawAnalysisChart(analysisResult, canvas) {
         chartHeight,
         maxDistance,
         maxTimeDiff,
-        zeroY
+        zeroY,
+        baseImage: ctx.getImageData(0, 0, canvas.width, canvas.height),
+        trackLookup: new Map([
+            [`${analysisResult.baseline.fileId}:${analysisResult.baseline.trackIndex}`, analysisResult.baseline],
+            ...analysisResult.comparisons.map(comparison => [
+                `${comparison.fileId}:${comparison.trackIndex}`, comparison
+            ])
+        ])
     };
 }
 
@@ -194,37 +203,26 @@ export function drawPlaybackMarkers(chartData) {
     
     const { ctx, canvas, padding, chartWidth, chartHeight, maxDistance, analysisResult, zeroY, maxTimeDiff } = chartData;
     
-    // Clear the entire canvas first to prevent ghosting
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Redraw the chart components
-    drawAxes(ctx, canvas, padding, chartWidth, chartHeight, zeroY);
-    drawGrid(ctx, padding, chartWidth, chartHeight);
-    drawLabels(ctx, canvas, padding, chartWidth, chartHeight, maxDistance, maxTimeDiff, zeroY);
-    drawDataLines(ctx, analysisResult, padding, chartWidth, chartHeight, maxDistance, maxTimeDiff, zeroY);
-    drawLegend(ctx, canvas, analysisResult, padding);
+    // Restore the static chart instead of redrawing every line, label, and legend.
+    ctx.putImageData(chartData.baseImage, 0, 0);
     
     // Now draw the playback markers on top
     playbackState.tracks.forEach(track => {
         if (track.currentPointIndex < track.startIndex || track.currentPointIndex > track.endIndex) return;
         
-        // Find matching track in analysis
-        let matchingTrack = null;
-        if (track.fileId === analysisResult.baseline.fileId && 
-            track.trackIndex === analysisResult.baseline.trackIndex) {
-            matchingTrack = analysisResult.baseline;
-        } else {
-            matchingTrack = analysisResult.comparisons.find(comp => 
-                comp.fileId === track.fileId && comp.trackIndex === track.trackIndex
-            );
-        }
+        const matchingTrack = chartData.trackLookup.get(`${track.fileId}:${track.trackIndex}`);
         
         if (!matchingTrack) return;
         
         // Calculate current distance
-        const segmentPoints = track.points.slice(track.startIndex, track.currentPointIndex + 1);
-        const currentDistance = calculateCumulativeDistances(segmentPoints);
-        const distanceKm = currentDistance[currentDistance.length - 1] / 1000;
+        let cumulativeDistances = cumulativeDistanceCache.get(track.points);
+        if (!cumulativeDistances) {
+            cumulativeDistances = calculateCumulativeDistances(track.points);
+            cumulativeDistanceCache.set(track.points, cumulativeDistances);
+        }
+        const currentDistance = cumulativeDistances[track.currentPointIndex] -
+            cumulativeDistances[track.startIndex];
+        const distanceKm = currentDistance / 1000;
         
         // Draw vertical marker line
         const x = padding + (distanceKm / maxDistance) * chartWidth;

@@ -15,6 +15,7 @@ export const PLAYBACK_CONFIG = {
     DEFAULT_SPEED: 1,
     SAMPLE_POINTS: 100, // Number of sample points for analysis
     INTERPOLATED_START_DELAY: 500, // Delay in ms at start line
+    SMOOTHING_SUBDIVISIONS: 4, // Precomputed playback points per GPS segment
     SMOOTH_INTERPOLATION: true,
     FOLLOW_LOCATION: true
 };

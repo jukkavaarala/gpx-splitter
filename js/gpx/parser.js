@@ -3,6 +3,9 @@
  * Functions for parsing GPX files
  */
 
+import { PLAYBACK_CONFIG } from '../config.js';
+import { createSmoothedPlaybackPoints } from '../utils/geometry.js';
+
 /**
  * Parse GPX file content
  * @param {string} gpxContent - GPX file content as string
@@ -13,6 +16,12 @@ export function parseGPX(gpxContent) {
     const xmlDoc = parser.parseFromString(gpxContent, "text/xml");
     
     const tracks = parseTracks(xmlDoc);
+    tracks.forEach(track => {
+        track.playbackPoints = createSmoothedPlaybackPoints(
+            track.points,
+            PLAYBACK_CONFIG.SMOOTHING_SUBDIVISIONS
+        );
+    });
     const routes = parseRoutes(xmlDoc);
     const waypoints = parseWaypoints(xmlDoc);
     

@@ -154,3 +154,69 @@ export function interpolatePosition(pos1, pos2, progress) {
         lng: pos1.lng + (pos2.lng - pos1.lng) * progress
     };
 }
+
+/**
+ * Generate a smoothed playback path using Catmull-Rom interpolation.
+ * Source points are retained at segment boundaries and generated points
+ * receive timestamps distributed between the surrounding source points.
+ * @param {Array} points - Original GPS points
+ * @param {number} subdivisions - Number of playback intervals per segment
+ * @returns {Array} Precomputed playback points
+ */
+export function createSmoothedPlaybackPoints(points, subdivisions = 4) {
+    if (points.length < 3 || subdivisions < 2) {
+        return points.map(point => ({ ...point }));
+    }
+
+    const smoothedPoints = [];
+
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[Math.max(0, i - 1)];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[Math.min(points.length - 1, i + 2)];
+
+        for (let step = 0; step < subdivisions; step++) {
+            const t = step / subdivisions;
+            const t2 = t * t;
+            const t3 = t2 * t;
+            const lat = 0.5 * (
+                2 * p1.lat +
+                (-p0.lat + p2.lat) * t +
+                (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 +
+                (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3
+            );
+            const lng = 0.5 * (
+                2 * p1.lng +
+                (-p0.lng + p2.lng) * t +
+                (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 +
+                (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3
+            );
+
+            const point = {
+                lat,
+                lng,
+                elevation: p1.elevation,
+                time: interpolatePointTime(p1.time, p2.time, t)
+            };
+
+            if (step === 0) {
+                Object.assign(point, p1);
+            }
+            smoothedPoints.push(point);
+        }
+    }
+
+    smoothedPoints.push({ ...points[points.length - 1] });
+    return smoothedPoints;
+}
+
+function interpolatePointTime(startTime, endTime, progress) {
+    if (!startTime || !endTime) return startTime || endTime || null;
+
+    const start = new Date(startTime).getTime();
+    const end = new Date(endTime).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end)) return startTime;
+
+    return new Date(start + (end - start) * progress).toISOString();
+}

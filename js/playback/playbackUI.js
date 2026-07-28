@@ -15,28 +15,38 @@ import { calculatePlaybackProgress } from './playbackManager.js';
  * @returns {L.CircleMarker} Playback marker
  */
 export function createTrackPlaybackMarker(track, lat, lng, playbackLayer) {
-    // Remove existing marker
-    if (track.marker) {
-        playbackLayer.removeLayer(track.marker);
-    }
-    
     // Check if file is visible
     const file = gpxFiles.get(track.fileId);
     if (!file || !file.visible) {
-        track.marker = null;
+        if (track.marker) {
+            playbackLayer.removeLayer(track.marker);
+        }
         return null;
+    }
+
+    // Reuse the Leaflet layer; recreating it forces DOM/SVG work on every frame.
+    if (track.marker) {
+        track.marker.setLatLng([lat, lng]);
+        if (!playbackLayer.hasLayer(track.marker)) {
+            playbackLayer.addLayer(track.marker);
+        }
+        if (track.markerPointIndex === track.currentPointIndex) {
+            return track.marker;
+        }
     }
     
     // Create new marker
-    track.marker = L.circleMarker([lat, lng], {
-        radius: 8,
-        fillColor: track.color,
-        color: '#ffffff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.9,
-        className: 'playback-marker'
-    }).addTo(playbackLayer);
+    if (!track.marker) {
+        track.marker = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: track.color,
+            color: '#ffffff',
+            weight: 3,
+            opacity: 1,
+            fillOpacity: 0.9,
+            className: 'playback-marker'
+        }).addTo(playbackLayer);
+    }
     
     // Add popup with current point info
     const point = track.points[track.currentPointIndex];
@@ -69,6 +79,7 @@ export function createTrackPlaybackMarker(track, lat, lng, playbackLayer) {
             <p><strong>Coordinates:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
         </div>
     `);
+    track.markerPointIndex = track.currentPointIndex;
     
     return track.marker;
 }

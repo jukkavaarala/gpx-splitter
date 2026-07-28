@@ -26,6 +26,41 @@ import {
 let map, lineManager, playbackLayer;
 let currentAnalysisChart = null;
 let isUpdatingAnalysis = false;
+let playbackMetrics = null;
+
+function startPlaybackMetrics(tracks) {
+    playbackMetrics = {
+        startedAt: performance.now(),
+        frames: 0,
+        frameTime: 0,
+        markerTime: 0,
+        progressTime: 0,
+        mapTime: 0,
+        chartTime: 0,
+        sourcePoints: tracks.reduce((total, track) => total + track.sourcePointCount, 0),
+        playbackPoints: tracks.reduce((total, track) => total + track.playbackPointCount, 0)
+    };
+}
+
+function reportPlaybackMetrics() {
+    if (!playbackMetrics || playbackMetrics.frames === 0) return;
+
+    const metrics = playbackMetrics;
+    const elapsed = performance.now() - metrics.startedAt;
+    console.table({
+        'Playback duration (s)': (elapsed / 1000).toFixed(1),
+        'Frames': metrics.frames,
+        'Average frame (ms)': (metrics.frameTime / metrics.frames).toFixed(2),
+        'Markers (ms/frame)': (metrics.markerTime / metrics.frames).toFixed(2),
+        'Chart (ms/frame)': (metrics.chartTime / metrics.frames).toFixed(2),
+        'Map follow (ms/frame)': (metrics.mapTime / metrics.frames).toFixed(2),
+        'Progress UI (ms/frame)': (metrics.progressTime / metrics.frames).toFixed(2),
+        'Source points': metrics.sourcePoints,
+        'Playback points held': metrics.playbackPoints,
+        'Smoothing multiplier': (metrics.playbackPoints / Math.max(1, metrics.sourcePoints)).toFixed(2)
+    });
+    playbackMetrics = null;
+}
 
 /**
  * Initialize event handlers
@@ -438,6 +473,9 @@ function startPlayback() {
     playbackState.isPlaying = true;
     playbackState.isPaused = false;
     playbackState.lastUpdateTime = Date.now();
+    startPlaybackMetrics(tracks);
+    const smoothInterpolation = document.getElementById('smoothInterpolation');
+    if (smoothInterpolation) smoothInterpolation.disabled = true;
     
     showPlaybackControls();
     updateTrackCountInfo(getPlaybackStatusMessage(lineManager.getStartLine(), lineManager.getFinishLine()));
@@ -492,8 +530,11 @@ function resumePlayback() {
  * Stop playback
  */
 function stopPlayback() {
+    reportPlaybackMetrics();
     playbackState.isPlaying = false;
     playbackState.isPaused = false;
+    const smoothInterpolation = document.getElementById('smoothInterpolation');
+    if (smoothInterpolation) smoothInterpolation.disabled = false;
     
     if (playbackState.animationId) {
         cancelAnimationFrame(playbackState.animationId);
@@ -518,12 +559,14 @@ function stopPlayback() {
 function animatePlayback() {
     if (!playbackState.isPlaying || playbackState.isPaused) return;
     
+    const frameStart = performance.now();
     const now = Date.now();
     const deltaTime = now - playbackState.lastUpdateTime;
     
     // Update tracks based on realtime timestamps
     let hasActiveMarkers = false;
     
+    const markerStart = performance.now();
     playbackState.tracks.forEach(track => {
         const file = gpxFiles.get(track.fileId);
         const isTrackVisible = file && file.visible;
@@ -539,16 +582,9 @@ function animatePlayback() {
                 // First point - initialize timing and position
                 track.startTime = now;
                 
-                // Initialize position based on interpolation mode
+                track.usingInterpolatedStart = !!(track.interpolatedStart && track.hasStartLine);
                 const position = updateTrackPosition(track);
                 createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
-                
-                // Set flags based on start line
-                if (track.interpolatedStart && track.hasStartLine) {
-                    track.usingInterpolatedStart = true;
-                } else {
-                    track.usingInterpolatedStart = false;
-                }
                 
                 track.trackStartTime = track.points[track.currentPointIndex].time ? 
                     new Date(track.points[track.currentPointIndex].time).getTime() : null;
@@ -585,32 +621,9 @@ function animatePlayback() {
             
             if (shouldAdvance && track.startTime !== null) {
                 if (track.usingInterpolatedStart) {
-                    // Transition from interpolated start to first actual GPS point
-                    if (playbackState.smoothInterpolation) {
-                        track.currentPosition = { ...track.interpolatedStart };
-                        track.targetPosition = { lat: currentPoint.lat, lng: currentPoint.lng };
-                        track.interpolationProgress = 0;
-                    }
                     track.usingInterpolatedStart = false;
                 } else {
-                    // Normal advancement - move to the next point
                     track.currentPointIndex++;
-                    if (track.currentPointIndex <= track.endIndex && track.currentPointIndex < track.points.length) {
-                        const nextGpsPoint = track.points[track.currentPointIndex];
-                        if (playbackState.smoothInterpolation) {
-                            // Initialize or update smooth interpolation
-                            if (track.currentPosition) {
-                                // Already initialized - advance from target to next point
-                                track.currentPosition = { ...track.targetPosition };
-                            } else {
-                                // First time initializing after enabling smooth mode - start from current point
-                                const currentGpsPoint = track.points[track.currentPointIndex];
-                                track.currentPosition = { lat: currentGpsPoint.lat, lng: currentGpsPoint.lng };
-                            }
-                            track.targetPosition = { lat: nextGpsPoint.lat, lng: nextGpsPoint.lng };
-                            track.interpolationProgress = 0;
-                        }
-                    }
                 }
                 
                 if (isTrackVisible) hasActiveMarkers = true;
@@ -619,40 +632,31 @@ function animatePlayback() {
                 if (track.currentPointIndex > track.endIndex) {
                     track.isComplete = true;
                 }
-            } else if (playbackState.smoothInterpolation && track.currentPosition && track.targetPosition) {
-                // Update interpolation progress for smooth movement
-                const frameTime = deltaTime / 1000;
-                const interpolationSpeed = playbackState.speed;
-                track.interpolationProgress = Math.min(1, track.interpolationProgress + frameTime * interpolationSpeed);
-                if (isTrackVisible) hasActiveMarkers = true;
             } else {
                 if (isTrackVisible) hasActiveMarkers = true;
             }
             
             // Update marker position
-            // Use jump mode if smooth interpolation is enabled but positions not yet initialized
-            // This prevents skip when toggling smooth mode mid-playback
-            let position;
-            if (playbackState.smoothInterpolation && !track.currentPosition) {
-                // Smooth mode enabled but not initialized yet - use jump mode temporarily
-                const currentPoint = track.points[track.currentPointIndex];
-                position = { lat: currentPoint.lat, lng: currentPoint.lng };
-            } else {
-                // Normal operation - use updateTrackPosition
-                position = updateTrackPosition(track);
-            }
+            const position = updateTrackPosition(track);
             
             if (position && isTrackVisible) {
                 createTrackPlaybackMarker(track, position.lat, position.lng, playbackLayer);
             }
         }
     });
+    if (playbackMetrics) playbackMetrics.markerTime += performance.now() - markerStart;
     
+    const progressStart = performance.now();
     updatePlaybackProgress();
+    if (playbackMetrics) playbackMetrics.progressTime += performance.now() - progressStart;
+    const mapStart = performance.now();
     updateMapViewForPlayback(map);
+    if (playbackMetrics) playbackMetrics.mapTime += performance.now() - mapStart;
     
     if (currentAnalysisChart) {
+        const chartStart = performance.now();
         drawPlaybackMarkers(currentAnalysisChart);
+        if (playbackMetrics) playbackMetrics.chartTime += performance.now() - chartStart;
     }
     
     // Check if all tracks are complete
@@ -672,6 +676,10 @@ function animatePlayback() {
     }
     
     playbackState.lastUpdateTime = now;
+    if (playbackMetrics) {
+        playbackMetrics.frames++;
+        playbackMetrics.frameTime += performance.now() - frameStart;
+    }
     playbackState.animationId = requestAnimationFrame(animatePlayback);
 }
 
