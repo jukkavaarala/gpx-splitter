@@ -18,12 +18,12 @@ body {
 .controls {
     position: absolute;
     top: 80px;
-    right: 20px;
-    left: auto;
+    left: 20px;
+    right: auto;
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 8px;
     width: max-content;
     max-width: calc(100vw - 40px);
@@ -44,14 +44,36 @@ body {
 
 .map-control-btn {
     color: #f8fafc;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 10px;
+    font-size: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: all 0.3s ease, max-width 0.3s ease;
 }
 
 .map-control-btn::before {
     display: inline-block;
-    margin-right: 7px;
+    margin-right: 0;
     font-size: 15px;
     line-height: 1;
     vertical-align: -1px;
+}
+
+.map-control-btn:hover,
+.map-control-btn:focus-visible {
+    width: max-content;
+    min-width: 44px;
+    max-width: 240px;
+    padding: 10px 15px;
+    font-size: 14px;
+}
+
+.map-control-btn:hover::before,
+.map-control-btn:focus-visible::before {
+    margin-right: 7px;
 }
 
 .map-control-btn.file-list-btn::before {
@@ -94,13 +116,13 @@ body {
 }
 
 .map-control-btn.file-list-btn {
-    background: #0f766e;
-    border-color: #0f766e;
+    background: #c2415a;
+    border-color: #c2415a;
 }
 
 .map-control-btn.file-list-btn:hover {
-    background: #115e59;
-    border-color: #115e59;
+    background: #9f3046;
+    border-color: #9f3046;
 }
 
 .map-control-btn.playback-btn-control {
@@ -237,14 +259,14 @@ body {
 }
 
 #toggleFileList {
-    background: #17a2b8;
-    color: white;
-    border-color: #17a2b8;
+    background: #c2415a;
+    color: #f8fafc;
+    border-color: #c2415a;
 }
 
 #toggleFileList:hover {
-    background: #138496;
-    border-color: #117a8b;
+    background: #9f3046;
+    border-color: #9f3046;
 }
 
 #toggleCourseLines {
@@ -726,8 +748,8 @@ body {
 @media (max-width: 768px) {
     .controls {
         top: 75px;
-        right: 10px;
-        left: auto;
+        left: 10px;
+        right: auto;
     }
     
     .control-btn {
