@@ -126,6 +126,17 @@ body {
     border-color: #117a8b;
 }
 
+#toggleCourseLines {
+    background: #6f42c1;
+    color: white;
+    border-color: #6f42c1;
+}
+
+#toggleCourseLines:hover {
+    background: #5a2d8c;
+    border-color: #5a2d8c;
+}
+
 .file-upload-wrapper {
     position: relative;
 }
@@ -138,6 +149,127 @@ body {
 
 .file-list-upload .control-btn {
     width: 100%;
+}
+
+.course-lines-controls {
+    position: absolute;
+    top: 80px;
+    right: 20px;
+    width: 300px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    resize: both;
+    min-width: 260px;
+    min-height: 250px;
+}
+
+.course-lines-controls.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
+}
+
+.course-lines-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #6f42c1 0%, #8e44ad 100%);
+    color: white;
+}
+
+.course-lines-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.course-lines-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+}
+
+.line-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+    color: #495057;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.line-status {
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.line-status-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.show-line-link {
+    color: #0d6efd;
+    font-size: 12px;
+    font-weight: 400;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.show-line-link:hover {
+    color: #084298;
+}
+
+.line-status.set {
+    color: #198754;
+    font-weight: 600;
+}
+
+.course-line-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 9px 12px;
+    color: white;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.start-line-btn {
+    background: #28a745;
+}
+
+.start-line-btn:hover {
+    background: #218838;
+}
+
+.finish-line-btn {
+    background: #dc3545;
+}
+
+.finish-line-btn:hover {
+    background: #c82333;
+}
+
+.clear-lines-btn {
+    margin-top: 8px;
+    background: #6c757d;
+}
+
+.clear-lines-btn:hover {
+    background: #5a6268;
 }
 
 /* GPX File List Panel */
@@ -1087,6 +1219,13 @@ body {
         width: auto;
         height: auto;
         max-height: calc(100vh - 80px);
+    }
+
+    .course-lines-controls {
+        top: 70px;
+        left: 10px;
+        right: 10px;
+        width: auto;
     }
     
     .gpx-file-list {

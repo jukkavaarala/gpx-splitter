@@ -133,6 +133,30 @@ function setupFileUploadHandlers() {
  * Setup line drawing event handlers
  */
 function setupLineDrawingHandlers() {
+    document.getElementById('toggleCourseLines')?.addEventListener('click', function() {
+        const controls = document.getElementById('courseLinesControls');
+        if (!controls) return;
+
+        const isHidden = controls.classList.toggle('hidden');
+        this.textContent = isHidden ? 'Edit Course' : 'Hide Edit Course';
+    });
+
+    document.getElementById('closeCourseLines')?.addEventListener('click', function() {
+        document.getElementById('courseLinesControls')?.classList.add('hidden');
+        const toggleButton = document.getElementById('toggleCourseLines');
+        if (toggleButton) toggleButton.textContent = 'Edit Course';
+    });
+
+    document.getElementById('showStartLine')?.addEventListener('click', function(event) {
+        event.preventDefault();
+        showLineOnMap(lineManager.getStartLine());
+    });
+
+    document.getElementById('showFinishLine')?.addEventListener('click', function(event) {
+        event.preventDefault();
+        showLineOnMap(lineManager.getFinishLine());
+    });
+
     document.getElementById('addStartLine')?.addEventListener('click', function() {
         if (lineManager.isDrawingStartLine) {
             lineManager.resetDrawing();
@@ -156,7 +180,16 @@ function setupLineDrawingHandlers() {
     });
 
     document.getElementById('clearLines')?.addEventListener('click', function() {
+        if (!lineManager.getStartLine() && !lineManager.getFinishLine()) {
+            return;
+        }
+
+        if (!confirm('Clear both the start and finish lines?')) {
+            return;
+        }
+
         lineManager.clearAllLines();
+        updateLineDrawingUI();
     });
 
     // Map click handler for line drawing
@@ -177,11 +210,31 @@ function setupLineDrawingHandlers() {
 }
 
 /**
+ * Fit the map view to a course line.
+ * @param {Object|null} courseLine - Course line with a Leaflet polyline
+ */
+function showLineOnMap(courseLine) {
+    if (!courseLine?.line) return;
+
+    map.fitBounds(courseLine.line.getBounds(), {
+        padding: [80, 80],
+        animate: true,
+        duration: 0.8
+    });
+}
+
+/**
  * Update line drawing UI buttons
  */
 function updateLineDrawingUI() {
     const startBtn = document.getElementById('addStartLine');
     const finishBtn = document.getElementById('addFinishLine');
+    const startStatus = document.getElementById('startLineStatus');
+    const finishStatus = document.getElementById('finishLineStatus');
+    const showStartLink = document.getElementById('showStartLine');
+    const showFinishLink = document.getElementById('showFinishLine');
+    const startLine = lineManager.getStartLine();
+    const finishLine = lineManager.getFinishLine();
     
     if (startBtn) {
         startBtn.classList.remove('active');
@@ -189,7 +242,24 @@ function updateLineDrawingUI() {
     }
     if (finishBtn) {
         finishBtn.classList.remove('active');
-        finishBtn.textContent = 'Add Finish Line';
+        finishBtn.textContent = finishLine ? 'Edit Finish Line' : 'Add Finish Line';
+    }
+    if (startBtn) {
+        startBtn.textContent = startLine ? 'Edit Start Line' : 'Add Start Line';
+    }
+    if (startStatus) {
+        startStatus.textContent = startLine ? 'Set' : 'Not set';
+        startStatus.classList.toggle('set', Boolean(startLine));
+    }
+    if (finishStatus) {
+        finishStatus.textContent = finishLine ? 'Set' : 'Not set';
+        finishStatus.classList.toggle('set', Boolean(finishLine));
+    }
+    if (showStartLink) {
+        showStartLink.classList.toggle('hidden', !startLine);
+    }
+    if (showFinishLink) {
+        showFinishLink.classList.toggle('hidden', !finishLine);
     }
 }
 
