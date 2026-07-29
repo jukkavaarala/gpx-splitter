@@ -25,6 +25,7 @@
         <button id="cropGpxFiles" class="control-btn">Crop GPX Files</button>
         <button id="undoCrop" class="control-btn hidden">Undo Crop</button>
         <button id="analyzeTracks" class="control-btn">Analyze Tracks</button>
+        <button id="toggleHelp" class="control-btn">Show Help</button>
     </div>
     
     <!-- Playback Controls -->
@@ -95,6 +96,42 @@
                     Select tracks to see analysis
                 </div>
             </div>
+        </div>
+        <div class="resize-handle"></div>
+    </div>
+
+    <!-- Help Window -->
+    <div id="helpControls" class="help-controls resizable-panel hidden">
+        <div class="help-header panel-header">
+            <h4>GPX Splitter Help</h4>
+            <button id="closeHelp" class="close-btn">&times;</button>
+        </div>
+        <div class="help-content">
+            <h5>Getting started</h5>
+            <p>Upload one or more GPX files with <strong>Upload GPX</strong>. Tracks are drawn on the map and appear in the file list.</p>
+
+            <h5>Map controls</h5>
+            <ul>
+                <li>Use <strong>Add Start Line</strong> and <strong>Add Finish Line</strong>, then draw each line on the map.</li>
+                <li>Use <strong>Clear Lines</strong> to remove the start and finish lines.</li>
+                <li>Use <strong>Show Files</strong> to show or hide loaded files. File and lap visibility can be changed in the file list.</li>
+            </ul>
+
+            <h5>Laps and analysis</h5>
+            <ul>
+                <li>Select a track or lap as the baseline in the file list.</li>
+                <li>Use <strong>Crop GPX Files</strong> after drawing start and finish lines to create lap files. <strong>Undo Crop</strong> restores the original files.</li>
+                <li>Select <strong>Analyze Tracks</strong> to compare visible tracks against the selected baseline.</li>
+            </ul>
+
+            <h5>Playback</h5>
+            <ul>
+                <li>Open the playback window with <strong>Show Playback</strong>.</li>
+                <li>Use play, pause, stop, speed, and the progress slider to control playback.</li>
+                <li><strong>Smooth movement</strong> interpolates marker movement, and <strong>Follow location</strong> keeps the map centered on playback.</li>
+            </ul>
+
+            <p class="help-note">Panels can be moved by dragging their headers and resized from the bottom-right corner.</p>
         </div>
         <div class="resize-handle"></div>
     </div>

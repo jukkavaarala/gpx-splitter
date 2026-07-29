@@ -77,6 +77,7 @@ export function initializeEventHandlers(mapInstance, lineManagerInstance, playba
     setupLineDrawingHandlers();
     setupCropHandlers();
     setupFileListHandlers();
+    setupHelpHandlers();
     setupPlaybackHandlers();
     setupAnalysisHandlers();
     setupKeyboardHandlers();
@@ -281,6 +282,25 @@ function setupFileListHandlers() {
     };
     
     window.toggleFileGroup = toggleFileGroup;
+}
+
+/**
+ * Setup help window handlers
+ */
+function setupHelpHandlers() {
+    document.getElementById('toggleHelp')?.addEventListener('click', function() {
+        const help = document.getElementById('helpControls');
+        if (!help) return;
+
+        const isHidden = help.classList.toggle('hidden');
+        this.textContent = isHidden ? 'Show Help' : 'Hide Help';
+    });
+
+    document.getElementById('closeHelp')?.addEventListener('click', function() {
+        document.getElementById('helpControls')?.classList.add('hidden');
+        const toggleButton = document.getElementById('toggleHelp');
+        if (toggleButton) toggleButton.textContent = 'Show Help';
+    });
 }
 
 /**
