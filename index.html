@@ -13,10 +13,6 @@
 </head>
 <body>
     <div class="controls">
-        <div class="file-upload-wrapper">
-            <input type="file" id="gpxFileInput" accept=".gpx" multiple style="display: none;">
-            <button id="uploadGpx" class="control-btn">Upload GPX</button>
-        </div>
         <button id="toggleFileList" class="control-btn">Show Files</button>
         <button id="togglePlayback" class="control-btn">Show Playback</button>
         <button id="addStartLine" class="control-btn">Add Start Line</button>
@@ -140,6 +136,10 @@
         <div class="file-list-header panel-header">
             <h3>Loaded GPX Files</h3>
             <button id="closeFileList" class="close-btn">&times;</button>
+        </div>
+        <div class="file-upload-wrapper file-list-upload">
+            <input type="file" id="gpxFileInput" accept=".gpx" multiple style="display: none;">
+            <button id="uploadGpx" class="control-btn">Upload GPX</button>
         </div>
         <div id="fileListContent" class="file-list-content">
             <p class="no-files">No GPX files loaded</p>

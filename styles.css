@@ -130,6 +130,16 @@ body {
     position: relative;
 }
 
+.file-list-upload {
+    padding: 12px 16px;
+    border-bottom: 1px solid #dee2e6;
+    background: rgba(248, 249, 250, 0.9);
+}
+
+.file-list-upload .control-btn {
+    width: 100%;
+}
+
 /* GPX File List Panel */
 /* Resizable and Draggable Panel Styles */
 .resizable-panel {
