@@ -46,6 +46,49 @@ body {
     color: #f8fafc;
 }
 
+.map-control-btn::before {
+    display: inline-block;
+    margin-right: 7px;
+    font-size: 15px;
+    line-height: 1;
+    vertical-align: -1px;
+}
+
+.map-control-btn.file-list-btn::before {
+    content: '〰';
+}
+
+.map-control-btn.playback-btn-control::before {
+    content: '▶';
+}
+
+.map-control-btn.course-lines-btn::before {
+    content: '⚑';
+}
+
+.map-control-btn.crop-btn::before {
+    content: '✂';
+}
+
+.map-control-btn.undo-crop-btn::before {
+    content: '↶';
+}
+
+.map-control-btn.analyze-btn::before {
+    content: '⌁';
+}
+
+.map-control-btn.help-btn::before {
+    content: '?';
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    width: 15px;
+    height: 15px;
+    font-size: 11px;
+    line-height: 13px;
+    text-align: center;
+}
+
 .map-control-btn:hover {
     color: #f8fafc;
 }
