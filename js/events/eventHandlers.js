@@ -7,7 +7,7 @@ import { parseGPX } from '../gpx/parser.js';
 import { addGpxFile, removeGpxFile, toggleGpxFileVisibility, getVisibleBounds } from '../gpx/fileManager.js';
 import { cropAllGpxFiles, undoCrop, hasBackup } from '../gpx/cropper.js';
 import { showFileInfo } from '../ui/fileInfo.js';
-import { updateFileList, toggleFileListPanel, toggleFileGroup } from '../ui/fileList.js';
+import { updateFileList, toggleFileListPanel, toggleFileGroup, updateFileListToggleLabel } from '../ui/fileList.js';
 import { gpxFiles, setBaselineSelection, getBaselineSelection, playbackState, resetPlaybackState } from '../state.js';
 import { calculateTrackAnalysis } from '../analysis/analyzer.js';
 import { drawAnalysisChart, handleChartClick, drawPlaybackMarkers } from '../analysis/chartRenderer.js';
@@ -138,7 +138,7 @@ function setupLineDrawingHandlers() {
         if (!controls) return;
 
         const isHidden = controls.classList.toggle('hidden');
-        this.textContent = isHidden ? 'Edit Course' : 'Hide Edit Course';
+        this.textContent = 'Edit Course';
     });
 
     document.getElementById('closeCourseLines')?.addEventListener('click', function() {
@@ -322,12 +322,12 @@ function updateCropButtonVisibility() {
  */
 function setupFileListHandlers() {
     document.getElementById('toggleFileList')?.addEventListener('click', toggleFileListPanel);
+    updateFileListToggleLabel();
     
     document.getElementById('closeFileList')?.addEventListener('click', function() {
         const fileList = document.getElementById('gpxFileList');
-        const button = document.getElementById('toggleFileList');
         fileList?.classList.add('hidden');
-        if (button) button.textContent = 'Show Files';
+        updateFileListToggleLabel();
     });
     
     // Make functions globally available for onclick handlers
@@ -384,7 +384,7 @@ function setupPlaybackHandlers() {
         if (!controls) return;
 
         const isHidden = controls.classList.toggle('hidden');
-        this.textContent = isHidden ? 'Show Playback' : 'Hide Playback';
+        this.textContent = 'Playback';
     });
     
     document.getElementById('playPauseBtn')?.addEventListener('click', function() {
@@ -403,7 +403,7 @@ function setupPlaybackHandlers() {
         stopPlayback();
         document.getElementById('playbackControls')?.classList.add('hidden');
         const toggleButton = document.getElementById('togglePlayback');
-        if (toggleButton) toggleButton.textContent = 'Show Playback';
+        if (toggleButton) toggleButton.textContent = 'Playback';
     });
 
     document.getElementById('playbackSpeed')?.addEventListener('change', function() {

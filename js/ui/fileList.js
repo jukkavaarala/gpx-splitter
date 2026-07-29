@@ -219,10 +219,21 @@ export function toggleFileGroup(baseName) {
  */
 export function toggleFileListPanel() {
     const fileList = document.getElementById('gpxFileList');
-    const button = document.getElementById('toggleFileList');
     
-    if (fileList && button) {
+    if (fileList) {
         fileList.classList.toggle('hidden');
-        button.textContent = fileList.classList.contains('hidden') ? 'Show Files' : 'Hide Files';
+        updateFileListToggleLabel();
+    }
+}
+
+/**
+ * Keep the file-panel toggle label synchronized with its visibility.
+ */
+export function updateFileListToggleLabel() {
+    const fileList = document.getElementById('gpxFileList');
+    const button = document.getElementById('toggleFileList');
+
+    if (fileList && button) {
+        button.textContent = 'Edit Tracks';
     }
 }

@@ -164,7 +164,7 @@ export function showPlaybackControls() {
     if (controls) {
         controls.classList.remove('hidden');
         const toggleButton = document.getElementById('togglePlayback');
-        if (toggleButton) toggleButton.textContent = 'Hide Playback';
+        if (toggleButton) toggleButton.textContent = 'Playback';
     }
 }
 
@@ -176,7 +176,7 @@ export function hidePlaybackControls() {
     if (controls) {
         controls.classList.add('hidden');
         const toggleButton = document.getElementById('togglePlayback');
-        if (toggleButton) toggleButton.textContent = 'Show Playback';
+        if (toggleButton) toggleButton.textContent = 'Playback';
     }
 }
 

@@ -1290,7 +1290,7 @@ function toggleFileList() {
     const button = document.getElementById('toggleFileList');
     
     fileList.classList.toggle('hidden');
-    button.textContent = fileList.classList.contains('hidden') ? 'Show Files' : 'Hide Files';
+    button.textContent = 'Edit Tracks';
 }
 
 document.getElementById('toggleFileList').addEventListener('click', toggleFileList);
@@ -1299,7 +1299,7 @@ document.getElementById('closeFileList').addEventListener('click', function () {
     const fileList = document.getElementById('gpxFileList');
     const button = document.getElementById('toggleFileList');
     fileList.classList.add('hidden');
-    button.textContent = 'Show Files';
+    button.textContent = 'Edit Tracks';
 });
 
 // Function to clear all lines

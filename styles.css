@@ -42,6 +42,84 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+.map-control-btn {
+    color: #f8fafc;
+}
+
+.map-control-btn:hover {
+    color: #f8fafc;
+}
+
+.map-control-btn.file-list-btn {
+    background: #0f766e;
+    border-color: #0f766e;
+}
+
+.map-control-btn.file-list-btn:hover {
+    background: #115e59;
+    border-color: #115e59;
+}
+
+.map-control-btn.playback-btn-control {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+
+.map-control-btn.playback-btn-control:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.map-control-btn.course-lines-btn {
+    background: #7c3aed;
+    border-color: #7c3aed;
+}
+
+.map-control-btn.course-lines-btn:hover {
+    background: #6d28d9;
+    border-color: #6d28d9;
+}
+
+.map-control-btn.crop-btn {
+    background: #d97706;
+    border-color: #d97706;
+}
+
+.map-control-btn.crop-btn:hover {
+    background: #b45309;
+    border-color: #b45309;
+}
+
+.map-control-btn.undo-crop-btn {
+    background: #ea580c;
+    border-color: #ea580c;
+}
+
+.map-control-btn.undo-crop-btn:hover {
+    background: #c2410c;
+    border-color: #c2410c;
+}
+
+.map-control-btn.analyze-btn {
+    background: #be185d;
+    border-color: #be185d;
+}
+
+.map-control-btn.analyze-btn:hover {
+    background: #9d174d;
+    border-color: #9d174d;
+}
+
+.map-control-btn.help-btn {
+    background: #0891b2;
+    border-color: #0891b2;
+}
+
+.map-control-btn.help-btn:hover {
+    background: #0e7490;
+    border-color: #0e7490;
+}
+
 .control-btn:hover {
     background: #f0f0f0;
     border-color: #999;
@@ -983,6 +1061,29 @@ body {
 #toggleHelp:hover {
     background: #159d78;
     border-color: #128765;
+}
+
+/* ID-specific overrides to keep Edit Course and Analyze Tracks visually distinct */
+#toggleCourseLines {
+    background: #7c3aed;
+    color: #f8fafc;
+    border-color: #7c3aed;
+}
+
+#toggleCourseLines:hover {
+    background: #6d28d9;
+    border-color: #6d28d9;
+}
+
+#analyzeTracks {
+    background: #15803d;
+    color: #f8fafc;
+    border-color: #15803d;
+}
+
+#analyzeTracks:hover {
+    background: #166534;
+    border-color: #166534;
 }
 
 /* Help Window */
