@@ -1,114 +1,119 @@
 # gpx-splitter
 
-**gpx-splitter** is a comprehensive web application for visualizing, analyzing, splitting, and comparing GPX tracks. Designed for racing analysis and track comparison, it allows users to upload multiple GPX files, define start/finish lines, analyze lap segments, and perform detailed time difference analysis with interactive playback features.
+**gpx-splitter** is a client-side web application for visualizing, analyzing, splitting, and comparing GPX tracks. Designed for racing analysis and track comparison, it lets you upload multiple GPX files, define start/finish lines, split tracks into laps, and compare performance with interactive time-difference analysis and simultaneous playback.
 
 ## 🚀 Live Demo
 
 **Try it now:** [https://jukkavaarala.github.io/gpx-splitter/](https://jukkavaarala.github.io/gpx-splitter/)
 
-No installation required - just open the link and start analyzing your GPX tracks immediately!
+No installation required - just open the link and start analyzing your GPX tracks immediately.
 
 ## Key Features
 
 ### 📁 **File Management**
-- **Multi-file GPX upload:** Support for multiple GPX files with drag-and-drop interface
+- **Multi-file GPX upload:** Load one or more GPX files at once via the **Upload GPX** button
 - **Comprehensive parsing:** Handles tracks, routes, and waypoints from standard GPX files
-- **Smart file organization:** Automatic grouping of lap files with expandable/collapsible lists
-- **File information modals:** Detailed info buttons showing distance, duration, elevation, and metadata
-- **Visibility controls:** Show/hide individual tracks or entire file groups
+- **Smart file organization:** Laps are grouped under their original GPX file with expandable/collapsible lists
+- **File information modals:** Info buttons showing distance, duration, elevation, point count, and timestamps
+- **Visibility controls:** Show/hide individual tracks or lap segments
 - **Color coding:** Unique colors for each file and lap for easy identification
 - **Baseline management:** Set any track or lap as the baseline for analysis
-- **File removal:** Easy deletion of unwanted tracks with confirmation
+- **File removal:** Remove unwanted tracks with a single click
 
 ### 🗺️ **Interactive Map Display**
-- **Leaflet.js integration:** High-quality interactive map with multiple tile layers
-- **Satellite imagery:** Switch between street maps and satellite view
+- **Leaflet.js integration:** Interactive map with multiple base layers
+- **Street & satellite layers:** Switch between OpenStreetMap and Esri satellite imagery
 - **Dynamic track rendering:** Real-time visualization of all loaded tracks
-- **Custom map controls:** Side-by-side zoom and layer controls for optimal positioning
+- **Custom map controls:** Side-by-side zoom and layer controls
 - **Scale indicator:** Metric scale display for distance reference
-- **Responsive design:** Works seamlessly on desktop and mobile devices
 - **Auto-zoom:** Automatically fits map bounds to show all visible tracks
-- **Performance optimization:** Efficient rendering of large GPX files
+- **Track popups:** Click any track, route, or waypoint for details
 
 ### 🏁 **Start/Finish Line Management**
-- **Interactive line drawing:** Click to draw start and finish lines on the map
-- **Visual indicators:** Clear green (START) and red (FINISH) line markers
-- **Precision intersection detection:** Advanced algorithms for accurate track-line intersections
-- **Line management:** Clear, modify, or redraw lines as needed
+- **Interactive line drawing:** Click two points on the map to draw start and finish lines
+- **Visual indicators:** Green (START) and red (FINISH) dashed line markers with labels
+- **Line management:** Add, edit, or clear lines; "Show on map" links to locate a line
+- **Precision intersection detection:** Geometric algorithms for accurate track-line intersections
 
 ### ✂️ **Track Cropping & Lap Detection**
 - **Multi-lap support:** Automatically detects multiple laps when tracks cross start/finish lines
-- **Smart cropping:** Removes tracks that don't intersect with defined lines
-- **Lap segmentation:** Creates separate lap files with unique colors
+- **Smart cropping:** Splits tracks into separate lap files at line crossings
+- **Lap segmentation:** Creates separate lap entries with unique colors
 - **Precise interpolation:** Calculates exact intersection points for accurate lap boundaries
 - **Undo functionality:** Restore original files with one click
 
 ### 📊 **Track Analysis**
 - **Baseline selection:** Choose any track or lap as the baseline for comparison
 - **Time difference analysis:** Compare track performance with detailed timing metrics
-- **Interactive charts:** Click on chart points to seek to specific locations during playback
+- **Interactive chart:** Click on chart points to seek to specific locations during playback
 - **Real-time normalization:** All tracks start at 0-second difference for fair comparison
 - **Distance and duration stats:** Comprehensive metrics for each track and lap segment
-- **Scrollable interface:** Analysis panels with scrollbars to handle many tracks
-- **Visual feedback:** Color-coded analysis matching track colors
-- **Performance metrics:** Speed analysis, elevation data, and timing comparisons
+- **Live legend:** Deltas relative to the baseline update during playback
+- **Auto-refresh:** Analysis updates when tracks are added, removed, hidden, or the baseline changes
 
 ### ▶️ **Advanced Playback System**
 - **Simultaneous playback:** Animate multiple tracks at the same time
-- **Real-time timing:** Uses GPX timestamps for accurate speed representation
-- **Smooth interpolation:** Optional smooth movement between GPS points
-- **Visibility-aware markers:** Playback markers automatically hide/show with track visibility
-- **Interactive progress:** Click to seek, adjustable speed controls
+- **Real-time timing:** Uses GPX timestamps for accurate speed representation (falls back to fixed intervals without timing data)
+- **Smooth interpolation:** Optional Catmull-Rom smoothing between GPS points
+- **Follow location:** Keeps the map centered on the active playback markers
+- **Interactive progress:** Click to seek, adjustable speed controls (0.5x–10x)
 - **Lap-aware playback:** Respects start/finish line boundaries during animation
+- **Keyboard shortcuts:** Space to play/pause, Enter to stop, Escape to cancel drawing
 
 ### 🎨 **Visual Features**
 - **Unique lap colors:** Each lap gets its own distinct color variation
-- **Movable and resizable panels:** Drag and resize playback, file list, and track analysis panels
+- **Movable and resizable panels:** Drag and resize the file list, playback, analysis, course, and help panels
 - **Smart panel stacking:** Panels automatically come to front when clicked or dragged
 - **Persistent layouts:** Panel positions and sizes are saved and restored between sessions
-- **Mobile-friendly touch support:** Full gesture support for drag and resize on mobile devices
 - **Visual feedback:** Hover effects, drag shadows, and smooth transitions during interactions
-- **Dynamic UI positioning:** Flexible panel arrangement for optimal workflow
-- **Responsive design:** Adapts to different screen sizes with appropriate scaling
 - **Status indicators:** Clear feedback for all operations and current states
-- **Progress tracking:** Real-time progress bars and completion indicators
 
 ## Technical Implementation
 
+### **Architecture**
+The application is built as a modular ES module application. The entry point is `main.js`, which wires together focused modules under the `js/` directory:
+
+- `js/map/` – Leaflet map and start/finish line management
+- `js/gpx/` – GPX parsing, cropping, and line-intersection detection
+- `js/analysis/` – Track comparison, chart rendering, and analysis UI
+- `js/playback/` – Simultaneous playback engine and controls
+- `js/ui/` – File list, file info, and panel drag/resize management
+- `js/utils/` – Geometry, color, and formatting helpers
+- `js/state.js` – Centralized application state
+- `js/config.js` – Configuration constants
+
 ### **Frontend Stack**
 - **HTML5/CSS3:** Modern responsive design with flexbox and advanced CSS features
-- **Vanilla JavaScript:** No frameworks - optimized for performance and simplicity
-- **Leaflet.js v1.9.4:** Interactive maps with multiple tile layer support
+- **Vanilla JavaScript (ES modules):** No frameworks - optimized for performance and simplicity
+- **Leaflet.js v1.9.4:** Interactive maps with multiple base layer support
 - **Canvas API:** Custom chart rendering for analysis visualization
 - **LocalStorage API:** Persistent panel state and user preferences
-- **Touch Events:** Full mobile gesture support for drag and resize operations
-- **CSS Transforms:** Hardware-accelerated animations and visual feedback
 
 ### **Core Algorithms**
 - **Line-segment intersection:** Geometric calculations for precise track-line intersections
-- **Lap detection:** Advanced sequencing algorithms to prevent duplicate lap detection
+- **Lap detection:** Sequencing algorithms to prevent duplicate lap detection
 - **Time interpolation:** Real-time playback using GPX timestamp data
 - **Color generation:** HSL-based color generation for optimal visual distinction
 - **Panel management:** Dynamic z-index stacking and position persistence
 - **Distance calculation:** Haversine formula for accurate GPS distance measurements
-- **Smooth interpolation:** Geographic point interpolation for fluid playback animation
+- **Smooth interpolation:** Catmull-Rom interpolation for fluid playback animation
 
 ### **File Processing**
-- **GPX parsing:** Complete DOM-based parsing of tracks, routes, and waypoints
+- **GPX parsing:** DOM-based parsing of tracks, routes, and waypoints
 - **Data validation:** Robust error handling for malformed GPX files
 - **Memory management:** Efficient handling of large track files
 - **Backup system:** Full state preservation for undo operations
 
 ## Usage Workflow
 
-1. **Upload GPX files** using the "Upload GPX" button or drag-and-drop multiple files
+1. **Upload GPX files** using the **Upload GPX** button in the **Edit Tracks** window
 2. **Organize your workspace** by dragging and resizing the panels to your preference
 3. **Explore file information** using the info buttons (ℹ️) to see distance, duration, and elevation data
-4. **Set start/finish lines** by clicking "Add Start Line" and "Add Finish Line", then clicking two points on the map
-5. **Crop tracks** to focus only on tracks that intersect with your lines (creates lap segments)
+4. **Set start/finish lines** by opening **Edit Course**, clicking **Add Start Line** / **Add Finish Line**, then clicking two points on the map
+5. **Crop tracks** to split tracks into lap segments based on your lines (use **Undo Crop** to restore)
 6. **Select a baseline** by clicking the chart button (📊) on your reference track or lap
-7. **Analyze performance** using the "Analyze Tracks" button for detailed time difference comparison
-8. **Interactive analysis** by clicking on chart points to seek to specific locations
+7. **Analyze performance** using the **Analyze Tracks** button for detailed time difference comparison
+8. **Interact with analysis** by clicking on chart points to seek to specific locations
 9. **Play back tracks** simultaneously to visualize the race progression with real-time timing
 10. **Compare different scenarios** by toggling visibility of different tracks and lap segments
 
@@ -118,13 +123,11 @@ No installation required - just open the link and start analyzing your GPX track
 - **Firefox 75+** (Full support)
 - **Safari 13+** (Full support)
 - **Edge 80+** (Full support)
-- **Mobile browsers** (Touch-optimized interface)
 
 **Requirements:**
-- Modern browser with ES6+ support
-- Canvas and SVG support for charts
+- Modern browser with ES6+ module support
+- Canvas support for charts
 - LocalStorage for persistent settings
-- Touch events for mobile devices
 
 ## Installation & Setup
 
@@ -139,8 +142,12 @@ git clone https://github.com/jukkavaarala/gpx-splitter.git
 cd gpx-splitter
 
 # Open in your browser
-# Simply open index.html in any modern web browser
+# Serve the directory locally (ES modules require a web server)
+python -m http.server 8000
+# Then open http://localhost:8000
 ```
+
+> **Note:** Because the app uses ES modules, open `index.html` through a local web server rather than the `file://` protocol.
 
 ### GitHub Pages Deployment
 The application is automatically deployed to GitHub Pages from the main branch.
@@ -153,7 +160,6 @@ The application features a sophisticated panel management system:
 - **Resize panels** using the resize handle in the bottom-right corner
 - **Auto-stacking** - panels automatically come to front when interacted with
 - **Persistent state** - your panel layout is saved and restored between sessions
-- **Touch support** - full mobile gesture support for all interactions
 
 ### Lap Detection System
 The smart lap detection algorithm:
@@ -171,14 +177,14 @@ Comprehensive performance analysis:
 
 ## Contributing
 
-Contributions are welcome! This project is built with vanilla JavaScript for maximum compatibility and performance.
+Contributions are welcome! This project is built with vanilla JavaScript (ES modules) for maximum compatibility and performance.
 
 ### Development Guidelines
-- Use modern ES6+ JavaScript features
+- Use modern ES6+ module features
 - Maintain responsive design principles
 - Ensure cross-browser compatibility
 - Add comments for complex algorithms
-- Test on both desktop and mobile devices
+- Keep modules focused and single-purpose under `js/`
 
 ## License
 
