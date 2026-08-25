@@ -260,9 +260,8 @@ function createFinishOnlyLaps(track, finishLine, finishIntersections) {
         const finishPoint = finishIntersections[i];
         const prevFinishPoint = finishIntersections[i - 1];
         const startIndex = prevFinishPoint ? prevFinishPoint.pointIndex : 0;
-        finishPoint.intersectionPoint ||
-            
-        const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+        const interpolatedEnd = finishPoint.intersectionPoint ||
+            calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
         
         laps.push({
             startIndex: startIndex,
