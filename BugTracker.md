@@ -51,6 +51,26 @@ Any additional information.
 
 <!-- Add new bugs below using the template -->
 ```markdown
+### [BUG-002] Playback and track analysis not in sync
+
+- **Status:** Open
+- **Severity:** High
+- **Priority:** P2
+
+#### Description
+During playback the position in the map and graph in the track analysis are not in sync. E.g. lap X might be behind lap Y in the map but ahead in the analysis.
+
+#### Expected Behavior
+Playback and analysis should be same. 
+
+```
+
+
+
+## Resolved Bugs
+
+<!-- Move resolved bugs here, keeping their full history -->
+```markdown
 ### [BUG-001] Track cropping affects tracks that are not crossing start/finish lines
 
 - **Status:** Fixed
@@ -71,23 +91,3 @@ Tracks should be cropped/split only when intersecting with start/finish lines
 #### Resolution
 `findAllLineIntersections` in `js/gpx/intersection.js` selected any track point within `INTERSECTION_THRESHOLD` of the line, so tracks merely passing close to a line were treated as intersecting. Fixed by requiring an actual geometric crossing: each track segment is now tested with `lineSegmentIntersection`, and only true crossings count. The exact crossing coordinates are used as interpolated lap endpoints.
 ```
-```markdown
-### [BUG-002] Playback and track analysis not in sync
-
-- **Status:** Open
-- **Severity:** High
-- **Priority:** P2
-
-#### Description
-During playback the position in the map and graph in the track analysis are not in sync. E.g. lap X might be behind lap Y in the map but ahead in the analysis.
-
-#### Expected Behavior
-Playback and analysis should be same. 
-
-```
-
-
-
-## Resolved Bugs
-
-<!-- Move resolved bugs here, keeping their full history -->
