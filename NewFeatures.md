@@ -38,19 +38,7 @@ Any additional information.
 
 <!-- Add new feature requests below using the template -->
 ```markdown
-### [FEAT-001] Move Crop buttons
-
-- **Status:** Proposed
-- **Priority:** P2
-
-#### Summary
-Combine Edit course and cropping buttons 
-
-#### Detailed Description
-Crop/Undo Crop -buttons should be part of the Edit Course functionality. Remove separate buttons from the side menu and add them to Edit Course panel. Crop/undo crop buttons should toggle between themselves so that only one is shown at a time.
-```
-```markdown
-### [FEAT-001] Remove excess popups
+### [FEAT-002] Remove excess popups
 
 - **Status:** Proposed
 - **Priority:** P2
@@ -72,6 +60,18 @@ Remove popups if they are not necessary.
 ## Completed Features
 
 <!-- Move completed features here, keeping their full history -->
+```markdown
+### [FEAT-001] Move Crop buttons
+
+- **Status:** Implemented
+- **Priority:** P2
+
+#### Summary
+Combine Edit course and cropping buttons
+
+#### Detailed Description
+Crop/Undo Crop -buttons should be part of the Edit Course functionality. Remove separate buttons from the side menu and add them to Edit Course panel. Crop/undo crop buttons should toggle between themselves so that only one is shown at a time.
+```
 
 ## Rejected / On Hold
 

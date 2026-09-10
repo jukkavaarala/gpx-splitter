@@ -415,6 +415,12 @@ body {
     background: #5a6268;
 }
 
+.crop-course-btn,
+.undo-crop-btn {
+    width: 100%;
+    margin-top: 8px;
+}
+
 /* GPX File List Panel */
 /* Resizable and Draggable Panel Styles */
 .resizable-panel {

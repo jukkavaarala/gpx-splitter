@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPX-splitter (20260825-161115)</title>
+    <title>GPX-splitter (20260910-205134)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""/>
@@ -16,8 +16,6 @@
         <button id="toggleFileList" class="control-btn map-control-btn file-list-btn">Edit Tracks</button>
         <button id="togglePlayback" class="control-btn map-control-btn playback-btn-control">Playback</button>
         <button id="toggleCourseLines" class="control-btn map-control-btn course-lines-btn">Edit Course</button>
-        <button id="cropGpxFiles" class="control-btn map-control-btn crop-btn">Crop Tracks</button>
-        <button id="undoCrop" class="control-btn map-control-btn undo-crop-btn hidden">Undo Crop</button>
         <button id="analyzeTracks" class="control-btn map-control-btn analyze-btn">Analyze Tracks</button>
         <button id="toggleHelp" class="control-btn map-control-btn help-btn">Show Help</button>
     </div>
@@ -48,6 +46,8 @@
             <button id="addFinishLine" class="course-line-btn finish-line-btn">Add Finish Line</button>
 
             <button id="clearLines" class="course-line-btn clear-lines-btn">Clear All Lines</button>
+            <button id="cropGpxFiles" class="course-line-btn crop-course-btn">Crop Tracks</button>
+            <button id="undoCrop" class="course-line-btn undo-crop-btn hidden">Undo Crop</button>
         </div>
         <div class="resize-handle"></div>
     </div>

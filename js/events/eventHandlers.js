@@ -267,6 +267,8 @@ function updateLineDrawingUI() {
  * Setup crop/undo handlers
  */
 function setupCropHandlers() {
+    updateCropButtonVisibility();
+
     document.getElementById('cropGpxFiles')?.addEventListener('click', function() {
         const result = cropAllGpxFiles(lineManager.getStartLine(), lineManager.getFinishLine(), map);
         
