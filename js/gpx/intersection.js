@@ -22,16 +22,20 @@ export function findAllLineIntersections(track, line) {
     const lineEnd = lineLatLngs[1];
     const allIntersections = [];
     
-    // Find all points within threshold
-    for (let i = 0; i < track.points.length; i++) {
-        const point = track.points[i];
-        const distance = distanceToLineSegment(point, lineStart, lineEnd);
+    // Find actual crossings: track segments that truly intersect the line.
+    // Using a distance threshold alone would also match tracks that merely
+    // pass close to the line without crossing it (BUG-001).
+    for (let i = 0; i < track.points.length - 1; i++) {
+        const p1 = track.points[i];
+        const p2 = track.points[i + 1];
+        const intersection = lineSegmentIntersection(p1, p2, lineStart, lineEnd);
         
-        if (distance < INTERSECTION_THRESHOLD) {
+        if (intersection) {
             allIntersections.push({
                 pointIndex: i,
-                point: point,
-                distance: distance
+                point: p1,
+                intersectionPoint: intersection,
+                distance: 0
             });
         }
     }
@@ -193,8 +197,10 @@ function createStartFinishLaps(track, startLine, finishLine, startIntersections,
             const finishPoint = finishIntersections.find(f => f.pointIndex > startPoint.pointIndex);
             
             if (finishPoint) {
-                const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
-                const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+                const interpolatedStart = startPoint.intersectionPoint ||
+                    calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
+                const interpolatedEnd = finishPoint.intersectionPoint ||
+                    calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
                 
                 laps.push({
                     startIndex: startPoint.pointIndex,
@@ -226,7 +232,8 @@ function createStartOnlyLaps(track, startLine, startIntersections) {
         const nextStartPoint = startIntersections[i + 1];
         const endIndex = nextStartPoint ? nextStartPoint.pointIndex : track.points.length - 1;
         
-        const interpolatedStart = calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
+        const interpolatedStart = startPoint.intersectionPoint ||
+            calculateLineIntersectionPoint(track, startLine, startPoint.pointIndex);
         
         laps.push({
             startIndex: startPoint.pointIndex,
@@ -253,8 +260,8 @@ function createFinishOnlyLaps(track, finishLine, finishIntersections) {
         const finishPoint = finishIntersections[i];
         const prevFinishPoint = finishIntersections[i - 1];
         const startIndex = prevFinishPoint ? prevFinishPoint.pointIndex : 0;
-        
-        const interpolatedEnd = calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
+        const interpolatedEnd = finishPoint.intersectionPoint ||
+            calculateLineIntersectionPoint(track, finishLine, finishPoint.pointIndex);
         
         laps.push({
             startIndex: startIndex,
