@@ -23,7 +23,7 @@ No installation required - just open the link and start analyzing your GPX track
 ### 🗺️ **Interactive Map Display**
 - **Leaflet.js integration:** Interactive map with multiple base layers
 - **Street & satellite layers:** Switch between OpenStreetMap and Esri satellite imagery
-- **Dynamic track rendering:** Real-time visualization of all loaded tracks
+- **Track rendering:** All loaded tracks, routes, and waypoints drawn on the map
 - **Custom map controls:** Side-by-side zoom and layer controls
 - **Scale indicator:** Metric scale display for distance reference
 - **Auto-zoom:** Automatically fits map bounds to show all visible tracks
@@ -32,12 +32,13 @@ No installation required - just open the link and start analyzing your GPX track
 ### 🏁 **Start/Finish Line Management**
 - **Interactive line drawing:** Click two points on the map to draw start and finish lines
 - **Visual indicators:** Green (START) and red (FINISH) dashed line markers with labels
-- **Line management:** Add, edit, or clear lines; "Show on map" links to locate a line
-- **Precision intersection detection:** Geometric algorithms for accurate track-line intersections
+- **Line management:** Add, edit, or clear lines; each line shows a status and a "Show on map" link to locate it
+- **Clear with confirmation:** "Clear All Lines" removes both lines after a confirmation prompt
 
 ### ✂️ **Track Cropping & Lap Detection**
 - **Multi-lap support:** Automatically detects multiple laps when tracks cross start/finish lines
-- **Smart cropping:** Splits tracks into separate lap files at line crossings
+- **True-crossing detection:** Only tracks that actually cross a line are split, so tracks merely passing nearby are left untouched
+- **Smart cropping:** Splits tracks into separate lap files at line crossings, honoring each lap boundary
 - **Lap segmentation:** Creates separate lap entries with unique colors
 - **Precise interpolation:** Calculates exact intersection points for accurate lap boundaries
 - **Undo functionality:** Restore original files with one click
@@ -54,7 +55,7 @@ No installation required - just open the link and start analyzing your GPX track
 ### ▶️ **Advanced Playback System**
 - **Simultaneous playback:** Animate multiple tracks at the same time
 - **Real-time timing:** Uses GPX timestamps for accurate speed representation (falls back to fixed intervals without timing data)
-- **Smooth interpolation:** Optional Catmull-Rom smoothing between GPS points
+- **Smooth interpolation:** Optional Catmull-Rom smoothing of precomputed playback paths
 - **Follow location:** Keeps the map centered on the active playback markers
 - **Interactive progress:** Click to seek, adjustable speed controls (0.5x–10x)
 - **Lap-aware playback:** Respects start/finish line boundaries during animation
@@ -78,7 +79,7 @@ The application is built as a modular ES module application. The entry point is 
 - `js/analysis/` – Track comparison, chart rendering, and analysis UI
 - `js/playback/` – Simultaneous playback engine and controls
 - `js/ui/` – File list, file info, and panel drag/resize management
-- `js/utils/` – Geometry, color, and formatting helpers
+- `js/utils/` – Geometry, color, formatting, and shared track-segment helpers
 - `js/state.js` – Centralized application state
 - `js/config.js` – Configuration constants
 
@@ -90,18 +91,19 @@ The application is built as a modular ES module application. The entry point is 
 - **LocalStorage API:** Persistent panel state and user preferences
 
 ### **Core Algorithms**
-- **Line-segment intersection:** Geometric calculations for precise track-line intersections
-- **Lap detection:** Sequencing algorithms to prevent duplicate lap detection
-- **Time interpolation:** Real-time playback using GPX timestamp data
+- **Line-segment intersection:** True segment-crossing detection, so tracks passing near a line are not treated as crossing it
+- **Lap detection:** Sequencing algorithms that pair start/finish crossings and prevent duplicate laps
+- **Segment normalization:** Shared lap boundaries keep playback and analysis aligned
+- **Time interpolation:** Timestamp-based playback timing with an interval fallback when timing data is unavailable
 - **Color generation:** HSL-based color generation for optimal visual distinction
 - **Panel management:** Dynamic z-index stacking and position persistence
 - **Distance calculation:** Haversine formula for accurate GPS distance measurements
-- **Smooth interpolation:** Catmull-Rom interpolation for fluid playback animation
+- **Playback smoothing:** Catmull-Rom interpolation of precomputed playback paths
 
 ### **File Processing**
 - **GPX parsing:** DOM-based parsing of tracks, routes, and waypoints
 - **Data validation:** Robust error handling for malformed GPX files
-- **Memory management:** Efficient handling of large track files
+- **Dual data paths:** Original points are retained for analysis while smoothed paths drive playback
 - **Backup system:** Full state preservation for undo operations
 
 ## Usage Workflow
@@ -109,8 +111,8 @@ The application is built as a modular ES module application. The entry point is 
 1. **Upload GPX files** using the **Upload GPX** button in the **Edit Tracks** window
 2. **Organize your workspace** by dragging and resizing the panels to your preference
 3. **Explore file information** using the info buttons (ℹ️) to see distance, duration, and elevation data
-4. **Set start/finish lines** by opening **Edit Course**, clicking **Add Start Line** / **Add Finish Line**, then clicking two points on the map
-5. **Crop tracks** to split tracks into lap segments based on your lines (use **Undo Crop** to restore)
+4. **Set start/finish lines** by opening **Edit Course**, clicking **Add Start Line** / **Add Finish Line** (these become **Edit Start Line** / **Edit Finish Line** once a line exists), then clicking two points on the map
+5. **Crop tracks** from the **Edit Course** panel to split tracks into lap segments based on your lines (use **Undo Crop** to restore)
 6. **Select a baseline** by clicking the chart button (📊) on your reference track or lap
 7. **Analyze performance** using the **Analyze Tracks** button for detailed time difference comparison
 8. **Interact with analysis** by clicking on chart points to seek to specific locations
@@ -163,10 +165,11 @@ The application features a sophisticated panel management system:
 
 ### Lap Detection System
 The smart lap detection algorithm:
+- **True-crossing detection** - a lap boundary is created only where the track actually crosses the start/finish line
 - **Multiple crossing detection** - handles tracks that cross start/finish lines multiple times
-- **Prevents duplicates** - groups consecutive intersection points to avoid false laps
+- **Prevents duplicates** - groups consecutive crossing points to avoid false laps
 - **Precise timing** - uses interpolation for exact lap boundary calculations
-- **Visual feedback** - clear indicators for start/finish line intersections
+- **Clear indicators** - labeled START/FINISH lines on the map and flags on playback markers
 
 ### Analysis Capabilities
 Comprehensive performance analysis:
@@ -185,6 +188,7 @@ Contributions are welcome! This project is built with vanilla JavaScript (ES mod
 - Ensure cross-browser compatibility
 - Add comments for complex algorithms
 - Keep modules focused and single-purpose under `js/`
+- The legacy `script.js` is kept for reference only and is not loaded by `index.html`; make changes in `js/`
 
 ## License
 
