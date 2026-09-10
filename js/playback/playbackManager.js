@@ -4,9 +4,8 @@
  */
 
 import { playbackState, gpxFiles } from '../state.js';
-import { findTrackLaps } from '../gpx/intersection.js';
 import { calculateCumulativeDistances } from '../utils/geometry.js';
-import { PLAYBACK_CONFIG } from '../config.js';
+import { getTrackSegments, getTrackIdentity, getFileLapNumber } from '../utils/trackSegments.js';
 
 /**
  * Prepare tracks for simultaneous playback
@@ -26,7 +25,7 @@ export function prepareTracksForPlayback(startLine, finishLine) {
                     const smoothingFactor = track.points.length > 1 ?
                         (smoothedPoints.length - 1) / (track.points.length - 1) : 1;
                     const playbackPoints = playbackState.smoothInterpolation ? smoothedPoints : track.points;
-                    const laps = findTrackLaps(track, startLine, finishLine);
+                    const laps = getTrackSegments(track, startLine, finishLine);
                     
                     laps.forEach((lap, lapIndex) => {
                         let trackDisplayName = file.fileName;
@@ -38,6 +37,8 @@ export function prepareTracksForPlayback(startLine, finishLine) {
                             Math.round(lap.startIndex * smoothingFactor) : lap.startIndex;
                         const endIndex = playbackState.smoothInterpolation ?
                             Math.round(lap.endIndex * smoothingFactor) : lap.endIndex;
+                        const analysisLapNumber = laps.length > 1 ? lap.lapNumber :
+                            getFileLapNumber(file.fileName);
                         const trackData = {
                             fileId: fileId,
                             fileName: file.fileName,
@@ -56,6 +57,9 @@ export function prepareTracksForPlayback(startLine, finishLine) {
                             interpolatedStart: lap.interpolatedStart,
                             interpolatedEnd: lap.interpolatedEnd,
                             lapNumber: lap.lapNumber,
+                            analysisKey: getTrackIdentity(fileId, trackIndex, analysisLapNumber),
+                            analysisPoints: lap.points,
+                            analysisDistances: calculateCumulativeDistances(lap.points),
                             isComplete: false,
                             marker: null,
                             startTime: null,
@@ -131,17 +135,24 @@ export function seekPlaybackToDistance(targetDistance) {
     playbackState.tracks.forEach(track => {
         if (track.points.length === 0) return;
         
-        // Calculate cumulative distances for this track
+        // Map the shared analysis distance onto this playback path.
         const distances = calculateCumulativeDistances(
             track.points.slice(track.startIndex, track.endIndex + 1)
         );
+        const playbackDistance = distances[distances.length - 1] || 0;
+        const analysisDistance = track.analysisDistances[
+            track.analysisDistances.length - 1
+        ] || 0;
+        const targetProgress = analysisDistance > 0 ?
+            Math.max(0, Math.min(1, targetDistance / analysisDistance)) : 0;
+        const playbackTargetDistance = targetProgress * playbackDistance;
         
         // Find the point index closest to target distance
         let closestIndex = 0;
-        let minDiff = Math.abs(distances[0] - targetDistance);
+        let minDiff = Math.abs(distances[0] - playbackTargetDistance);
         
         for (let i = 1; i < distances.length; i++) {
-            const diff = Math.abs(distances[i] - targetDistance);
+            const diff = Math.abs(distances[i] - playbackTargetDistance);
             if (diff < minDiff) {
                 minDiff = diff;
                 closestIndex = i;
@@ -160,6 +171,9 @@ export function seekPlaybackToDistance(targetDistance) {
         track.currentPosition = null;
         track.targetPosition = null;
         track.interpolationProgress = 0;
+        if (targetProgress === 0 && track.interpolatedStart && track.hasStartLine) {
+            track.usingInterpolatedStart = true;
+        }
     });
 }
 

@@ -4,9 +4,9 @@
  */
 
 import { gpxFiles, getBaselineSelection } from '../state.js';
-import { findTrackLaps } from '../gpx/intersection.js';
-import { calculateCumulativeDistances, calculateHaversineDistance } from '../utils/geometry.js';
+import { calculateCumulativeDistances } from '../utils/geometry.js';
 import { PLAYBACK_CONFIG } from '../config.js';
+import { getTrackSegments } from '../utils/trackSegments.js';
 
 /**
  * Calculate track analysis comparing visible tracks to a baseline
@@ -92,18 +92,10 @@ function getVisibleTracks(startLine, finishLine) {
                         });
                     } else {
                         // Original file - check for laps
-                        const laps = findTrackLaps(track, startLine, finishLine);
+                        const laps = getTrackSegments(track, startLine, finishLine);
                         
                         laps.forEach((lap) => {
-                            const trackPoints = [];
-                            for (let i = lap.startIndex; i <= lap.endIndex; i++) {
-                                if (track.points[i]) {
-                                    trackPoints.push({
-                                        ...track.points[i],
-                                        originalIndex: i
-                                    });
-                                }
-                            }
+                            const trackPoints = lap.points;
                             
                             if (trackPoints.length > 1) {
                                 let trackName = file.fileName;
@@ -117,7 +109,7 @@ function getVisibleTracks(startLine, finishLine) {
                                     fileId: fileId,
                                     fileName: trackName,
                                     trackIndex: trackIndex,
-                            lapNumber: laps.length > 1 ? lap.lapNumber : undefined,
+                                    lapNumber: laps.length > 1 ? lap.lapNumber : undefined,
                                     points: trackPoints,
                                     color: file.color,
                                     segment: lap

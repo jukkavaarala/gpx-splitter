@@ -5,6 +5,7 @@
 
 import { playbackState, gpxFiles } from '../state.js';
 import { calculateCumulativeDistances } from '../utils/geometry.js';
+import { getTrackIdentity } from '../utils/trackSegments.js';
 
 const cumulativeDistanceCache = new WeakMap();
 
@@ -23,15 +24,16 @@ export function drawAnalysisChart(analysisResult, canvas) {
     const chartHeight = canvas.height - 2 * padding;
     
     // Find data ranges
-    const allDistances = analysisResult.comparisons.flatMap(comp => 
-        comp.timeDifferences.map(d => d.distance)
-    );
+    const allDistances = [
+        ...analysisResult.baseline.distances,
+        ...analysisResult.comparisons.flatMap(comp => comp.distances)
+    ];
     const allTimeDiffs = analysisResult.comparisons.flatMap(comp => 
         comp.timeDifferences.map(d => d.timeDifference)
     );
     
-    const maxDistance = Math.max(...allDistances) / 1000; // Convert to km
-    const maxTimeDiff = Math.max(...allTimeDiffs.map(Math.abs));
+    const maxDistance = Math.max(...allDistances, 1) / 1000; // Convert to km
+    const maxTimeDiff = Math.max(...allTimeDiffs.map(Math.abs), 1);
     const zeroY = canvas.height - padding - (maxTimeDiff > 0 ? (chartHeight / 2) : 0);
     
     // Clear canvas
@@ -58,9 +60,14 @@ export function drawAnalysisChart(analysisResult, canvas) {
         zeroY,
         baseImage: ctx.getImageData(0, 0, canvas.width, canvas.height),
         trackLookup: new Map([
-            [`${analysisResult.baseline.fileId}:${analysisResult.baseline.trackIndex}`, analysisResult.baseline],
+            [getTrackIdentity(
+                analysisResult.baseline.fileId,
+                analysisResult.baseline.trackIndex,
+                analysisResult.baseline.lapNumber
+            ), analysisResult.baseline],
             ...analysisResult.comparisons.map(comparison => [
-                `${comparison.fileId}:${comparison.trackIndex}`, comparison
+                getTrackIdentity(comparison.fileId, comparison.trackIndex, comparison.lapNumber),
+                comparison
             ])
         ])
     };
@@ -185,7 +192,7 @@ export function drawPlaybackMarkers(chartData) {
     playbackState.tracks.forEach(track => {
         if (track.currentPointIndex < track.startIndex || track.currentPointIndex > track.endIndex) return;
         
-        const matchingTrack = chartData.trackLookup.get(`${track.fileId}:${track.trackIndex}`);
+        const matchingTrack = chartData.trackLookup.get(track.analysisKey);
         
         if (!matchingTrack) return;
         
@@ -195,8 +202,14 @@ export function drawPlaybackMarkers(chartData) {
             cumulativeDistances = calculateCumulativeDistances(track.points);
             cumulativeDistanceCache.set(track.points, cumulativeDistances);
         }
-        const currentDistance = cumulativeDistances[track.currentPointIndex] -
+        const playbackDistance = cumulativeDistances[track.currentPointIndex] -
             cumulativeDistances[track.startIndex];
+        const playbackTotalDistance = cumulativeDistances[track.endIndex] -
+            cumulativeDistances[track.startIndex];
+        const normalizedProgress = playbackTotalDistance > 0 ?
+            playbackDistance / playbackTotalDistance : 0;
+        const analysisTotalDistance = track.analysisDistances[track.analysisDistances.length - 1] || 0;
+        const currentDistance = normalizedProgress * analysisTotalDistance;
         const distanceKm = currentDistance / 1000;
 
         if (matchingTrack !== analysisResult.baseline && matchingTrack.timeDifferences?.length > 0) {

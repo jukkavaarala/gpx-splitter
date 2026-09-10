@@ -50,22 +50,6 @@ Any additional information.
 ## Active Bugs
 
 <!-- Add new bugs below using the template -->
-```markdown
-### [BUG-002] Playback and track analysis not in sync
-
-- **Status:** Open
-- **Severity:** High
-- **Priority:** P2
-
-#### Description
-During playback the position in the map and graph in the track analysis are not in sync. E.g. lap X might be behind lap Y in the map but ahead in the analysis.
-
-#### Expected Behavior
-Playback and analysis should be same. 
-
-```
-
-
 
 ## Resolved Bugs
 
@@ -90,4 +74,17 @@ Tracks should be cropped/split only when intersecting with start/finish lines
 
 #### Resolution
 `findAllLineIntersections` in `js/gpx/intersection.js` selected any track point within `INTERSECTION_THRESHOLD` of the line, so tracks merely passing close to a line were treated as intersecting. Fixed by requiring an actual geometric crossing: each track segment is now tested with `lineSegmentIntersection`, and only true crossings count. The exact crossing coordinates are used as interpolated lap endpoints.
+```
+```markdown
+### [BUG-002] Playback and track analysis not in sync
+
+- **Status:** Fixed
+- **Severity:** High
+- **Priority:** P2
+
+#### Description
+During playback the position in the map and graph in the track analysis are not in sync. E.g. lap X might be behind lap Y in the map but ahead in the analysis.
+
+#### Resolution
+Playback and analysis now share normalized lap segments, including interpolated line-crossing endpoints and cumulative distances. Chart markers use stable file/track/lap identities, preventing multiple laps from overwriting each other, and chart seeking maps the shared analysis distance onto each playback path.
 ```
