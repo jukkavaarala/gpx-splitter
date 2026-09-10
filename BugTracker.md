@@ -48,11 +48,29 @@ Any additional information.
 ---
 
 ## Active Bugs
-
 <!-- Add new bugs below using the template -->
+```markdown
+### [BUG-003] Change upload gpx title
+
+- **Status:** Open
+- **Severity:** Low
+- **Priority:** P4
+
+#### Description
+Upload GPX button is incorrect as it does not actually upload the file anywhere but just load it instead to memory.
+
+#### Proposed Fix (optional)
+Change button text to 'Load GPX' or something that correspond the actual funtionality.
+
+#### Related Issues
+Links to related bugs, tasks, or discussions.
+
+#### Notes
+Any additional information.
+```
+
 
 ## Resolved Bugs
-
 <!-- Move resolved bugs here, keeping their full history -->
 ```markdown
 ### [BUG-001] Track cropping affects tracks that are not crossing start/finish lines

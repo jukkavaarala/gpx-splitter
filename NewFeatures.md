@@ -16,9 +16,6 @@ A generic template for proposing and tracking new features. Copy the template be
 #### Summary
 A brief one-or-two-sentence description of the feature.
 
-#### Motivation
-Why is this feature needed? What problem does it solve or what value does it add?
-
 #### Detailed Description
 A full description of the desired behavior and functionality.
 
@@ -40,6 +37,33 @@ Any additional information.
 ## Proposed Features
 
 <!-- Add new feature requests below using the template -->
+```markdown
+### [FEAT-001] Move Crop buttons
+
+- **Status:** Proposed
+- **Priority:** P2
+
+#### Summary
+Combine Edit course and cropping buttons 
+
+#### Detailed Description
+Crop/Undo Crop -buttons should be part of the Edit Course functionality. Remove separate buttons from the side menu and add them to Edit Course panel. Crop/undo crop buttons should toggle between themselves so that only one is shown at a time.
+```
+```markdown
+### [FEAT-001] Remove excess popups
+
+- **Status:** Proposed
+- **Priority:** P2
+
+#### Summary
+There are way too many popups e.g. when cropping
+
+#### Detailed Description
+Remove popups if they are not necessary.
+
+```
+
+
 
 ## In Progress
 
