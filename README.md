@@ -192,7 +192,20 @@ Contributions are welcome! This project is built with vanilla JavaScript (ES mod
 
 ## License
 
-This project is open source. Feel free to use, modify, and distribute according to your needs.
+**gpx-splitter** is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE). You are free to use, study, modify, and share it for **any non-commercial purpose**, including personal, hobby, educational, research, charitable, and government use.
+
+**Commercial use is not permitted under this license.** If you want to use gpx-splitter commercially, a separate commercial license is available from the copyright holder — please get in touch to discuss terms.
+
+> This project is source-available, not OSI "open source": the non-commercial restriction is intentional, so that the author retains the option to license it commercially.
+
+### Third-party components
+- [Leaflet](https://leafletjs.com/) — BSD-2-Clause
+- [Leaflet.draw](https://github.com/Leaflet/Leaflet.draw) — MIT
+
+These permissive licenses are compatible with the terms above. Their notices and attributions must be preserved.
+
+### Contributing
+Because the author may offer commercial licenses in the future, contributions require a Contributor License Agreement (CLA). See `CONTRIBUTING.md` for details.
 
 ---
 
