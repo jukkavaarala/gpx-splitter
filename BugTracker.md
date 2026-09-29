@@ -50,36 +50,6 @@ Any additional information.
 ## Active Bugs
 <!-- Add new bugs below using the template -->
 ```markdown
-### [BUG-006] Playback speed silently resets to 1x after stopping
-
-- **Status:** Open
-- **Severity:** Medium
-- **Priority:** P3
-- **Component/Area:** `js/state.js` (`resetPlaybackState`), `js/events/eventHandlers.js` (`stopPlayback`)
-- **Environment:** All browsers
-
-#### Description
-`resetPlaybackState()` sets `playbackState.speed = 1`, but the `#playbackSpeed` dropdown keeps the previously selected value. The next playback runs at 1x while the UI still shows e.g. 5x.
-
-#### Steps to Reproduce
-1. Start playback, set speed to 5x.
-2. Press Stop.
-3. Start playback again.
-
-#### Expected Behavior
-Playback uses the speed shown in the dropdown.
-
-#### Actual Behavior
-Playback uses 1x while the dropdown still reads 5x.
-
-#### Proposed Fix
-Do not reset `speed` in `resetPlaybackState()` (it is a user preference), or update the dropdown when resetting.
-
-#### Related Issues
-None
-```
-
-```markdown
 ### [BUG-007] Playback stalls when a track point has no timestamp
 
 - **Status:** Open
@@ -499,4 +469,36 @@ Pass the element/event explicitly, or attach a single delegated `click` listener
 
 #### Related Issues
 BUG-004
+```
+```markdown
+### [BUG-006] Playback speed silently resets to 1x after stopping
+
+- **Status:** Fixed
+- **Severity:** Medium
+- **Priority:** P3
+- **Component/Area:** `js/state.js` (`resetPlaybackState`), `js/events/eventHandlers.js` (`stopPlayback`)
+- **Environment:** All browsers
+
+#### Description
+`resetPlaybackState()` sets `playbackState.speed = 1`, but the `#playbackSpeed` dropdown keeps the previously selected value. The next playback runs at 1x while the UI still shows e.g. 5x.
+
+#### Steps to Reproduce
+1. Start playback, set speed to 5x.
+2. Press Stop.
+3. Start playback again.
+
+#### Expected Behavior
+Playback uses the speed shown in the dropdown.
+
+#### Actual Behavior
+Playback uses 1x while the dropdown still reads 5x.
+
+#### Proposed Fix
+Do not reset `speed` in `resetPlaybackState()` (it is a user preference), or update the dropdown when resetting.
+
+#### Resolution
+`resetPlaybackState()` in `js/state.js` no longer resets `playbackState.speed`, so the speed chosen in the `#playbackSpeed` dropdown is kept across Stop and the next playback runs at the speed the dropdown shows. `startPlayback()` in `js/events/eventHandlers.js` also reads the dropdown value when playback starts, so the two stay in sync even when the browser restores the dropdown value on reload or back-navigation.
+
+#### Related Issues
+None
 ```

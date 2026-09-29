@@ -597,6 +597,11 @@ function startPlayback() {
         return;
     }
     
+    // The dropdown is the source of truth (browsers may restore its value on reload)
+    const speedSelect = document.getElementById('playbackSpeed');
+    const selectedSpeed = parseFloat(speedSelect?.value);
+    if (selectedSpeed > 0) playbackState.speed = selectedSpeed;
+    
     playbackState.tracks = tracks;
     playbackState.maxPoints = maxPoints;
     playbackState.isPlaying = true;

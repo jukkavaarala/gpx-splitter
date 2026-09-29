@@ -156,14 +156,13 @@ export const playbackState = {
 };
 
 /**
- * Reset playback state
+ * Reset playback state (speed is a user preference and is kept)
  */
 export function resetPlaybackState() {
     playbackState.isPlaying = false;
     playbackState.isPaused = false;
     playbackState.tracks = [];
     playbackState.animationId = null;
-    playbackState.speed = 1;
     playbackState.lastUpdateTime = 0;
     playbackState.maxPoints = 0;
     playbackState.pauseStartTime = 0;
