@@ -50,35 +50,6 @@ Any additional information.
 ## Active Bugs
 <!-- Add new bugs below using the template -->
 ```markdown
-### [BUG-005] File-group expand/collapse relies on global `event` and breaks on quoted names
-
-- **Status:** Open
-- **Severity:** Medium
-- **Priority:** P3
-- **Component/Area:** `js/ui/fileList.js`
-- **Environment:** Firefox especially (non-standard `window.event`)
-
-#### Description
-`toggleFileGroup` reads the non-standard global `event.target`, and the group button embeds `baseName` inside a single-quoted inline `onclick`. File names containing `'` or `"` break the generated handler and can corrupt the markup.
-
-#### Steps to Reproduce
-1. Load a GPX file whose name contains an apostrophe (e.g. `Kätkä's race.gpx`).
-2. Crop it into laps and expand/collapse the group.
-
-#### Expected Behavior
-The group toggles reliably and names with quotes are safe.
-
-#### Actual Behavior
-The handler is malformed (or `event` is undefined in some browsers) and toggling fails.
-
-#### Proposed Fix
-Pass the element/event explicitly, or attach a single delegated `click` listener and read `data-group` attributes. Escape names (see BUG-004).
-
-#### Related Issues
-BUG-004
-```
-
-```markdown
 ### [BUG-006] Playback speed silently resets to 1x after stopping
 
 - **Status:** Open
@@ -497,4 +468,35 @@ Added an `escapeHtml` helper in `js/utils/formatters.js` and applied it to every
 
 #### Related Issues
 BUG-005, FEAT-004
+```
+```markdown
+### [BUG-005] File-group expand/collapse relies on global `event` and breaks on quoted names
+
+- **Status:** Fixed
+- **Severity:** Medium
+- **Priority:** P3
+- **Component/Area:** `js/ui/fileList.js`
+- **Environment:** Firefox especially (non-standard `window.event`)
+
+#### Description
+`toggleFileGroup` reads the non-standard global `event.target`, and the group button embeds `baseName` inside a single-quoted inline `onclick`. File names containing `'` or `"` break the generated handler and can corrupt the markup.
+
+#### Steps to Reproduce
+1. Load a GPX file whose name contains an apostrophe (e.g. `Kätkä's race.gpx`).
+2. Crop it into laps and expand/collapse the group.
+
+#### Expected Behavior
+The group toggles reliably and names with quotes are safe.
+
+#### Actual Behavior
+The handler is malformed (or `event` is undefined in some browsers) and toggling fails.
+
+#### Proposed Fix
+Pass the element/event explicitly, or attach a single delegated `click` listener and read `data-group` attributes. Escape names (see BUG-004).
+
+#### Resolution
+`toggleFileGroup` now receives the clicked button as an explicit argument (`onclick="toggleFileGroup(this.dataset.groupName, this)"`) instead of reading the global `event`. The quoted-name breakage was fixed under BUG-004 by passing the group name through an escaped `data-group-name` attribute.
+
+#### Related Issues
+BUG-004
 ```

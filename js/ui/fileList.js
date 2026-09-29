@@ -142,7 +142,7 @@ function renderFileGroup(baseName, files, callbacks, selectedBaselineFileId, sel
                 <div class="file-actions">
                     <button class="file-btn group-toggle" 
                             data-group-name="${escapeHtml(baseName)}"
-                            onclick="toggleFileGroup(this.dataset.groupName)" 
+                            onclick="toggleFileGroup(this.dataset.groupName, this)" 
                             title="Expand/Collapse laps">
                         ▼
                     </button>
@@ -199,11 +199,11 @@ function renderFileGroup(baseName, files, callbacks, selectedBaselineFileId, sel
 /**
  * Toggle file group expand/collapse
  * @param {string} baseName - Base name of the file group
+ * @param {HTMLElement} button - The toggle button that was clicked
  */
-export function toggleFileGroup(baseName) {
+export function toggleFileGroup(baseName, button) {
     const safeId = baseName.replace(/[^a-zA-Z0-9]/g, '_');
     const lapList = document.getElementById(`laps-${safeId}`);
-    const button = event.target;
     
     if (lapList && button) {
         if (lapList.style.display === 'none') {
