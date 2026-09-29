@@ -50,27 +50,6 @@ Any additional information.
 ## Active Bugs
 <!-- Add new bugs below using the template -->
 ```markdown
-### [BUG-003] Change upload gpx title
-
-- **Status:** Open
-- **Severity:** Low
-- **Priority:** P4
-
-#### Description
-Upload GPX button is incorrect as it does not actually upload the file anywhere but just load it instead to memory.
-
-#### Proposed Fix (optional)
-Change button text to 'Load GPX' or something that correspond the actual funtionality.
-
-#### Related Issues
-Links to related bugs, tasks, or discussions.
-
-#### Notes
-Any additional information.
-```
-
-
-```markdown
 ### [BUG-004] Unescaped GPX names are injected as HTML (XSS / broken UI)
 
 - **Status:** Open
@@ -494,4 +473,26 @@ During playback the position in the map and graph in the track analysis are not 
 
 #### Resolution
 Playback and analysis now share normalized lap segments, including interpolated line-crossing endpoints and cumulative distances. Chart markers use stable file/track/lap identities, preventing multiple laps from overwriting each other, and chart seeking maps the shared analysis distance onto each playback path.
+```
+```markdown
+### [BUG-003] Change upload gpx title
+
+- **Status:** Fixed
+- **Severity:** Low
+- **Priority:** P4
+
+#### Description
+Upload GPX button is incorrect as it does not actually upload the file anywhere but just load it instead to memory.
+
+#### Proposed Fix (optional)
+Change button text to 'Load GPX' or something that correspond the actual funtionality.
+
+#### Resolution
+Renamed the button to "Load GPX" in `index.html` and updated the related help text and README wording. The `uploadGpx` element id was left unchanged.
+
+#### Related Issues
+Links to related bugs, tasks, or discussions.
+
+#### Notes
+Any additional information.
 ```

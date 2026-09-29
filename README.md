@@ -1,6 +1,6 @@
 # gpx-splitter
 
-**gpx-splitter** is a client-side web application for visualizing, analyzing, splitting, and comparing GPX tracks. Designed for racing analysis and track comparison, it lets you upload multiple GPX files, define start/finish lines, split tracks into laps, and compare performance with interactive time-difference analysis and simultaneous playback.
+**gpx-splitter** is a client-side web application for visualizing, analyzing, splitting, and comparing GPX tracks. Designed for racing analysis and track comparison, it lets you load multiple GPX files, define start/finish lines, split tracks into laps, and compare performance with interactive time-difference analysis and simultaneous playback.
 
 ## 🚀 Live Demo
 
@@ -11,7 +11,7 @@ No installation required - just open the link and start analyzing your GPX track
 ## Key Features
 
 ### 📁 **File Management**
-- **Multi-file GPX upload:** Load one or more GPX files at once via the **Upload GPX** button
+- **Multi-file GPX loading:** Load one or more GPX files at once via the **Load GPX** button
 - **Comprehensive parsing:** Handles tracks, routes, and waypoints from standard GPX files
 - **Smart file organization:** Laps are grouped under their original GPX file with expandable/collapsible lists
 - **File information modals:** Info buttons showing distance, duration, elevation, point count, and timestamps
@@ -108,7 +108,7 @@ The application is built as a modular ES module application. The entry point is 
 
 ## Usage Workflow
 
-1. **Upload GPX files** using the **Upload GPX** button in the **Edit Tracks** window
+1. **Load GPX files** using the **Load GPX** button in the **Edit Tracks** window
 2. **Organize your workspace** by dragging and resizing the panels to your preference
 3. **Explore file information** using the info buttons (ℹ️) to see distance, duration, and elevation data
 4. **Set start/finish lines** by opening **Edit Course**, clicking **Add Start Line** / **Add Finish Line** (these become **Edit Start Line** / **Edit Finish Line** once a line exists), then clicking two points on the map
