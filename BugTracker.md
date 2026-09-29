@@ -82,36 +82,6 @@ None
 ```
 
 ```markdown
-### [BUG-008] Baseline selection is stale after crop/undo
-
-- **Status:** Open
-- **Severity:** Medium
-- **Priority:** P3
-- **Component/Area:** `js/gpx/cropper.js`, `js/state.js`
-- **Environment:** All browsers
-
-#### Description
-Cropping removes the original files and creates new file IDs; undo also re-adds restored files with fresh IDs. The baseline selection (`selectedBaselineFileId` / lap) is never remapped or cleared, so after crop/undo the baseline points at a removed file. Analysis silently falls back to the first track and the baseline highlight is wrong.
-
-#### Steps to Reproduce
-1. Load two tracks and set one as baseline.
-2. Crop tracks to laps.
-3. Run analysis and observe the baseline.
-
-#### Expected Behavior
-The baseline remains the corresponding lap, or is cleared predictably.
-
-#### Actual Behavior
-Baseline selection references a non-existent file ID.
-
-#### Proposed Fix
-Track the mapping from original file IDs to cropped lap files and remap the baseline, or clear the selection on crop/undo.
-
-#### Related Issues
-None
-```
-
-```markdown
 ### [BUG-009] Colliding lap file names for multi-track GPX files
 
 - **Status:** Open
@@ -498,6 +468,38 @@ Do not reset `speed` in `resetPlaybackState()` (it is a user preference), or upd
 
 #### Resolution
 `resetPlaybackState()` in `js/state.js` no longer resets `playbackState.speed`, so the speed chosen in the `#playbackSpeed` dropdown is kept across Stop and the next playback runs at the speed the dropdown shows. `startPlayback()` in `js/events/eventHandlers.js` also reads the dropdown value when playback starts, so the two stay in sync even when the browser restores the dropdown value on reload or back-navigation.
+
+#### Related Issues
+None
+```
+```markdown
+### [BUG-008] Baseline selection is stale after crop/undo
+
+- **Status:** Fixed
+- **Severity:** Medium
+- **Priority:** P3
+- **Component/Area:** `js/gpx/cropper.js`, `js/state.js`
+- **Environment:** All browsers
+
+#### Description
+Cropping removes the original files and creates new file IDs; undo also re-adds restored files with fresh IDs. The baseline selection (`selectedBaselineFileId` / lap) is never remapped or cleared, so after crop/undo the baseline points at a removed file. Analysis silently falls back to the first track and the baseline highlight is wrong.
+
+#### Steps to Reproduce
+1. Load two tracks and set one as baseline.
+2. Crop tracks to laps.
+3. Run analysis and observe the baseline.
+
+#### Expected Behavior
+The baseline remains the corresponding lap, or is cleared predictably.
+
+#### Actual Behavior
+Baseline selection references a non-existent file ID.
+
+#### Proposed Fix
+Track the mapping from original file IDs to cropped lap files and remap the baseline, or clear the selection on crop/undo.
+
+#### Resolution
+`js/gpx/cropper.js` now carries the baseline selection across crop and undo. On crop, the baseline is remapped to the lap file created from the same source file and track (the selected lap, or the first lap when a whole file was the baseline), and cleared when that track produced no lap. Each cropped file records its source file and track, so on undo the baseline is pointed back at the restored original file, or cleared if it has no counterpart.
 
 #### Related Issues
 None

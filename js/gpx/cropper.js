@@ -3,10 +3,17 @@
  * Handles cropping GPX tracks to start/finish lines
  */
 
-import { gpxFiles, setBackup, getBackup, clearBackup } from '../state.js';
+import { gpxFiles, setBackup, getBackup, clearBackup, getBaselineSelection, setBaselineSelection, clearBaselineSelection } from '../state.js';
 import { findTrackLaps } from './intersection.js';
 import { addGpxFile, removeGpxFile } from './fileManager.js';
 import { generateLapColor } from '../utils/colors.js';
+
+/**
+ * Origin of each cropped lap file (newFileId -> source file/track), used to
+ * carry the analysis baseline selection across crop and undo
+ * @type {Map<number, {originalFileId: number, originalTrackIndex: number}>}
+ */
+const cropOrigins = new Map();
 
 /**
  * Crop GPX data based on start and finish lines
@@ -110,6 +117,8 @@ export function cropAllGpxFiles(startLine, finishLine, map) {
     
     // Create backup before cropping
     createBackup();
+    cropOrigins.clear();
+    const previousBaseline = getBaselineSelection();
     
     let croppedCount = 0;
     const filesToRemove = [];
@@ -133,8 +142,9 @@ export function cropAllGpxFiles(startLine, finishLine, map) {
                     lapMap.forEach((tracks, lapNumber) => {
                         let fileName = file.fileName;
                         let lapColor = file.color;
+                        const isLapFile = lapGroups.size > 1 || lapMap.size > 1;
                         
-                        if (lapGroups.size > 1 || lapMap.size > 1) {
+                        if (isLapFile) {
                             const baseFileName = file.fileName.replace(/\.[^/.]+$/, '');
                             const extension = file.fileName.match(/\.[^/.]+$/) || [''];
                             fileName = `${baseFileName} (Lap ${lapNumber})${extension[0]}`;
@@ -152,7 +162,8 @@ export function cropAllGpxFiles(startLine, finishLine, map) {
                             wasVisible: file.visible,
                             originalFileId: fileId,
                             lapNumber: lapNumber,
-                            originalTrackIndex: originalTrackIndex
+                            originalTrackIndex: originalTrackIndex,
+                            isLapFile: isLapFile
                         });
                     });
                 });
@@ -172,6 +183,11 @@ export function cropAllGpxFiles(startLine, finishLine, map) {
     // Add cropped files
     filesToAdd.forEach(fileData => {
         const newFileId = addGpxFile(fileData.fileName, fileData.gpxData, map, fileData.originalColor);
+        fileData.newFileId = newFileId;
+        cropOrigins.set(newFileId, {
+            originalFileId: fileData.originalFileId,
+            originalTrackIndex: fileData.originalTrackIndex
+        });
         if (!fileData.wasVisible) {
             const file = gpxFiles.get(newFileId);
             if (file) {
@@ -181,12 +197,38 @@ export function cropAllGpxFiles(startLine, finishLine, map) {
         }
     });
     
+    remapBaselineAfterCrop(previousBaseline, filesToAdd);
+    
     return {
         success: true,
         croppedCount,
         lapsCreated: filesToAdd.length,
         filesWithoutIntersections
     };
+}
+
+/**
+ * Point the baseline selection at the cropped lap file that corresponds to the
+ * previous baseline, or clear it when that track produced no lap
+ * @param {Object} previous - Baseline selection before cropping
+ * @param {Array} addedFiles - Cropped file entries (with newFileId assigned)
+ */
+function remapBaselineAfterCrop(previous, addedFiles) {
+    if (previous.fileId === null) return;
+    
+    const candidates = addedFiles
+        .filter(f => f.originalFileId === previous.fileId &&
+                     f.originalTrackIndex === previous.trackIndex)
+        .sort((a, b) => a.lapNumber - b.lapNumber);
+    const match = previous.lapNumber === null ?
+        candidates[0] :
+        candidates.find(f => f.lapNumber === previous.lapNumber);
+    
+    if (match) {
+        setBaselineSelection(match.newFileId, 0, match.isLapFile ? match.lapNumber : null);
+    } else {
+        clearBaselineSelection();
+    }
 }
 
 /**
@@ -239,6 +281,8 @@ export function undoCrop(map) {
         return false;
     }
     
+    const currentBaseline = getBaselineSelection();
+    
     // Clear current files
     const currentFileIds = Array.from(gpxFiles.keys());
     currentFileIds.forEach(fileId => {
@@ -246,8 +290,10 @@ export function undoCrop(map) {
     });
     
     // Restore from backup
+    const restoredIds = new Map();
     backup.forEach((file, fileId) => {
         const newFileId = addGpxFile(file.fileName, file.data, map, file.color);
+        restoredIds.set(fileId, newFileId);
         if (!file.visible) {
             const restoredFile = gpxFiles.get(newFileId);
             if (restoredFile) {
@@ -257,8 +303,21 @@ export function undoCrop(map) {
         }
     });
     
+    // Point the baseline at the restored source of the current baseline lap
+    const origin = cropOrigins.get(currentBaseline.fileId);
+    if (origin && restoredIds.has(origin.originalFileId)) {
+        setBaselineSelection(
+            restoredIds.get(origin.originalFileId),
+            origin.originalTrackIndex,
+            currentBaseline.lapNumber
+        );
+    } else {
+        clearBaselineSelection();
+    }
+    
     // Clear backup
     clearBackup();
+    cropOrigins.clear();
     
     return true;
 }
