@@ -5,6 +5,7 @@
 
 import { playbackState, gpxFiles } from '../state.js';
 import { calculatePlaybackProgress } from './playbackManager.js';
+import { escapeHtml } from '../utils/formatters.js';
 
 /**
  * Create playback marker for a track
@@ -67,8 +68,8 @@ export function createTrackPlaybackMarker(track, lat, lng, playbackLayer) {
     
     track.marker.bindPopup(`
         <div>
-            <h4>${track.trackName}</h4>
-            <p><strong>File:</strong> ${track.fileName}</p>
+            <h4>${escapeHtml(track.trackName)}</h4>
+            <p><strong>File:</strong> ${escapeHtml(track.fileName)}</p>
             <p><strong>Segment Progress:</strong> ${progressInSegment} / ${track.segmentPoints}</p>
             <p><strong>Total Point:</strong> ${track.currentPointIndex + 1} / ${track.points.length}</p>
             ${track.hasStartLine ? '<p><span style="color: #28a745;">⚑ Started from start line</span></p>' : ''}

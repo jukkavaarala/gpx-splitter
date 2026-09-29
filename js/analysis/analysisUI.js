@@ -5,7 +5,7 @@
 
 import { setAnalysisVisible, setAnalysisChart, setAnalysisResult } from '../state.js';
 import { calculateTrackDistance } from '../utils/geometry.js';
-import { formatDistance, formatDuration, calculateTrackDuration } from '../utils/formatters.js';
+import { formatDistance, formatDuration, calculateTrackDuration, escapeHtml } from '../utils/formatters.js';
 
 /**
  * Show analysis panel
@@ -56,7 +56,7 @@ export function updateAnalysisStats(analysisResult) {
         let legendHtml = `
             <div class="analysis-legend-item">
                 <span class="analysis-legend-color" style="background-color: ${analysisResult.baseline.color};"></span>
-                <span>Baseline: ${analysisResult.baseline.fileName} (<span class="analysis-legend-delta">0.0s</span>)</span>
+                <span>Baseline: ${escapeHtml(analysisResult.baseline.fileName)} (<span class="analysis-legend-delta">0.0s</span>)</span>
             </div>
         `;
 
@@ -66,7 +66,7 @@ export function updateAnalysisStats(analysisResult) {
             legendHtml += `
                 <div class="analysis-legend-item">
                     <span class="analysis-legend-color" style="background-color: ${comparison.color};"></span>
-                    <span>${comparison.fileName} (<span class="analysis-legend-delta" data-file-id="${comparison.fileId}" data-track-index="${comparison.trackIndex}" data-lap-number="${comparison.lapNumber ?? ''}">${finalDifferenceText}</span>)</span>
+                    <span>${escapeHtml(comparison.fileName)} (<span class="analysis-legend-delta" data-file-id="${comparison.fileId}" data-track-index="${comparison.trackIndex}" data-lap-number="${comparison.lapNumber ?? ''}">${finalDifferenceText}</span>)</span>
                 </div>
             `;
         });
@@ -88,7 +88,7 @@ export function updateAnalysisStats(analysisResult) {
     
     let statsHtml = `
         <div style="margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-            <strong>Baseline:</strong> ${analysisResult.baseline.fileName}<br>
+            <strong>Baseline:</strong> ${escapeHtml(analysisResult.baseline.fileName)}<br>
             <strong>Distance:</strong> ${formatDistance(baselineDistance)}<br>
             <strong>Duration:</strong> ${formatDuration(baselineDuration)}
         </div>
@@ -106,7 +106,7 @@ export function updateAnalysisStats(analysisResult) {
             
             statsHtml += `
                 <div style="margin-bottom: 15px; padding: 10px; border-left: 4px solid ${comparison.color}; background-color: #f8f9fa;">
-                    <div style="color: ${comparison.color}; font-weight: bold; margin-bottom: 5px;">${comparison.fileName}:</div>
+                    <div style="color: ${comparison.color}; font-weight: bold; margin-bottom: 5px;">${escapeHtml(comparison.fileName)}:</div>
                     <strong>Distance:</strong> ${formatDistance(comparisonDistance)}`;
             
             if (Math.abs(distanceDiff) > 0.001) {

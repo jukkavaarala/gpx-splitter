@@ -5,7 +5,7 @@
 
 import { gpxFiles } from '../state.js';
 import { calculateTrackDistance } from '../utils/geometry.js';
-import { formatDistance, formatDuration, calculateTrackDuration } from '../utils/formatters.js';
+import { formatDistance, formatDuration, calculateTrackDuration, escapeHtml } from '../utils/formatters.js';
 import { findTrackLaps } from '../gpx/intersection.js';
 
 /**
@@ -91,7 +91,7 @@ export function showFileInfo(fileId, lapNumber, startLine, finishLine) {
     
     const infoContent = `
         <div style="max-width: 400px;">
-            <h3>${displayName}</h3>
+            <h3>${escapeHtml(displayName)}</h3>
             <p><strong>Distance:</strong> ${formatDistance(distance)}</p>
             <p><strong>Duration:</strong> ${formatDuration(duration)}</p>
             <p><strong>Points:</strong> ${pointCount}</p>

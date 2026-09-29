@@ -7,6 +7,7 @@ import { gpxFiles, getNextFileId } from '../state.js';
 import { generateColor } from '../utils/colors.js';
 import { GPX_TRACK_STYLE, GPX_WAYPOINT_STYLE, PLAYBACK_CONFIG } from '../config.js';
 import { createSmoothedPlaybackPoints } from '../utils/geometry.js';
+import { escapeHtml } from '../utils/formatters.js';
 
 /**
  * Create Leaflet layers from GPX data
@@ -34,8 +35,8 @@ export function createGpxLayers(gpxData, color, fileName, map) {
             // Add popup with track info
             const popupContent = `
                 <div>
-                    <h4>${track.name}</h4>
-                    <p><strong>File:</strong> ${fileName}</p>
+                    <h4>${escapeHtml(track.name)}</h4>
+                    <p><strong>File:</strong> ${escapeHtml(fileName)}</p>
                     <p><strong>Points:</strong> ${track.points.length}</p>
                     <p><strong>Segment:</strong> ${track.segment + 1}</p>
                     ${track.points[0].elevation ? `<p><strong>Start Elevation:</strong> ${track.points[0].elevation}m</p>` : ''}
@@ -61,8 +62,8 @@ export function createGpxLayers(gpxData, color, fileName, map) {
             
             polyline.bindPopup(`
                 <div>
-                    <h4>${route.name}</h4>
-                    <p><strong>File:</strong> ${fileName}</p>
+                    <h4>${escapeHtml(route.name)}</h4>
+                    <p><strong>File:</strong> ${escapeHtml(fileName)}</p>
                     <p><strong>Route Points:</strong> ${route.points.length}</p>
                     <p><em>Route (planned path)</em></p>
                 </div>
@@ -81,9 +82,9 @@ export function createGpxLayers(gpxData, color, fileName, map) {
         
         marker.bindPopup(`
             <div>
-                <h4>${waypoint.name}</h4>
-                <p><strong>File:</strong> ${fileName}</p>
-                ${waypoint.description ? `<p>${waypoint.description}</p>` : ''}
+                <h4>${escapeHtml(waypoint.name)}</h4>
+                <p><strong>File:</strong> ${escapeHtml(fileName)}</p>
+                ${waypoint.description ? `<p>${escapeHtml(waypoint.description)}</p>` : ''}
                 <p><strong>Coordinates:</strong> ${waypoint.lat.toFixed(6)}, ${waypoint.lng.toFixed(6)}</p>
             </div>
         `);

@@ -4,6 +4,7 @@
  */
 
 import { gpxFiles } from '../state.js';
+import { escapeHtml } from '../utils/formatters.js';
 
 /**
  * Update the file list UI
@@ -94,7 +95,7 @@ function renderSingleFile(fileData, callbacks, selectedBaselineFileId, selectedB
         <div class="file-item">
             <div class="file-color" style="background-color: ${file.color};"></div>
             <div class="file-info">
-                <div class="file-name" title="${file.fileName}">${file.fileName}</div>
+                <div class="file-name" title="${escapeHtml(file.fileName)}">${escapeHtml(file.fileName)}</div>
                 <div class="file-actions">
                     <button class="file-btn info" 
                             onclick="handleShowInfo(${fileId}, null)" 
@@ -133,14 +134,15 @@ function renderFileGroup(baseName, files, callbacks, selectedBaselineFileId, sel
             <div class="file-item group-header">
                 <div class="file-color" style="background-color: ${files[0].file.color};"></div>
                 <div class="file-info">
-                    <div class="file-name" title="${baseName}">${baseName}</div>
+                    <div class="file-name" title="${escapeHtml(baseName)}">${escapeHtml(baseName)}</div>
                     <div class="file-stats">
                         ${files.length} lap${files.length !== 1 ? 's' : ''}
                     </div>
                 </div>
                 <div class="file-actions">
                     <button class="file-btn group-toggle" 
-                            onclick="toggleFileGroup('${baseName}')" 
+                            data-group-name="${escapeHtml(baseName)}"
+                            onclick="toggleFileGroup(this.dataset.groupName)" 
                             title="Expand/Collapse laps">
                         ▼
                     </button>
@@ -158,7 +160,7 @@ function renderFileGroup(baseName, files, callbacks, selectedBaselineFileId, sel
             <div class="file-item lap-item">
                 <div class="file-color" style="background-color: ${file.color};"></div>
                 <div class="file-info">
-                    <div class="file-name" title="${file.fileName}">${displayName}</div>
+                    <div class="file-name" title="${escapeHtml(file.fileName)}">${escapeHtml(displayName)}</div>
                     <div class="file-actions">
                         <button class="file-btn info" 
                                 onclick="handleShowInfo(${fileId}, ${isLap ? lapNumber : 'null'})" 

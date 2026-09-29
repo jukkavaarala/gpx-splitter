@@ -50,39 +50,6 @@ Any additional information.
 ## Active Bugs
 <!-- Add new bugs below using the template -->
 ```markdown
-### [BUG-004] Unescaped GPX names are injected as HTML (XSS / broken UI)
-
-- **Status:** Open
-- **Severity:** High
-- **Priority:** P2
-- **Component/Area:** `js/gpx/fileManager.js`, `js/ui/fileList.js`, `js/ui/fileInfo.js`, `js/playback/playbackUI.js`
-- **Environment:** All browsers
-
-#### Description
-Track names, waypoint names/descriptions, and file names coming from the GPX file are concatenated into template strings that are assigned to `innerHTML` or `bindPopup` without escaping. A crafted GPX file can inject live HTML/script (stored XSS) or simply break the file-list layout.
-
-#### Steps to Reproduce
-1. Create a GPX file whose `<name>` (track or waypoint) contains `<img src=x onerror=alert(1)>`.
-2. Load the file and open the file list / click the track popup.
-3. Observe the markup being rendered/executed.
-
-#### Expected Behavior
-Names are displayed as literal text.
-
-#### Actual Behavior
-Markup is interpreted; scripts can execute and quotes in names break inline handlers.
-
-#### Possible Cause
-HTML string building (`innerHTML`, `bindPopup`) with raw values from the parsed file.
-
-#### Proposed Fix
-Add an `escapeHtml` helper and use text/DOM APIs, or escape every interpolated value. Pass IDs to inline handlers via `data-*` attributes with delegated listeners instead of embedding names.
-
-#### Related Issues
-BUG-005, FEAT-004
-```
-
-```markdown
 ### [BUG-005] File-group expand/collapse relies on global `event` and breaks on quoted names
 
 - **Status:** Open
@@ -495,4 +462,39 @@ Links to related bugs, tasks, or discussions.
 
 #### Notes
 Any additional information.
+```
+```markdown
+### [BUG-004] Unescaped GPX names are injected as HTML (XSS / broken UI)
+
+- **Status:** Fixed
+- **Severity:** High
+- **Priority:** P2
+- **Component/Area:** `js/gpx/fileManager.js`, `js/ui/fileList.js`, `js/ui/fileInfo.js`, `js/playback/playbackUI.js`
+- **Environment:** All browsers
+
+#### Description
+Track names, waypoint names/descriptions, and file names coming from the GPX file are concatenated into template strings that are assigned to `innerHTML` or `bindPopup` without escaping. A crafted GPX file can inject live HTML/script (stored XSS) or simply break the file-list layout.
+
+#### Steps to Reproduce
+1. Create a GPX file whose `<name>` (track or waypoint) contains `<img src=x onerror=alert(1)>`.
+2. Load the file and open the file list / click the track popup.
+3. Observe the markup being rendered/executed.
+
+#### Expected Behavior
+Names are displayed as literal text.
+
+#### Actual Behavior
+Markup is interpreted; scripts can execute and quotes in names break inline handlers.
+
+#### Possible Cause
+HTML string building (`innerHTML`, `bindPopup`) with raw values from the parsed file.
+
+#### Proposed Fix
+Add an `escapeHtml` helper and use text/DOM APIs, or escape every interpolated value. Pass IDs to inline handlers via `data-*` attributes with delegated listeners instead of embedding names.
+
+#### Resolution
+Added an `escapeHtml` helper in `js/utils/formatters.js` and applied it to every GPX-derived value interpolated into `innerHTML` or `bindPopup` (track/route/waypoint names, waypoint descriptions, file names, lap names) in `fileManager.js`, `fileList.js`, `fileInfo.js`, `playbackUI.js` and `analysisUI.js`. The group toggle button now passes the name via a `data-group-name` attribute instead of embedding it in the inline handler.
+
+#### Related Issues
+BUG-005, FEAT-004
 ```
